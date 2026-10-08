@@ -88,5 +88,12 @@ ECDSA P-256/P-384; the store integration is tested with software-backed keys.
   `/Type /Metadata` or `/Type /DSS` *label* on any other dictionary or stream (a page's Form
   XObject, say) makes nothing permitted, at every DocMDP level.
 
+- **Chains are checked, not just linked.** `x509::build_chain` only takes an issuer whose key
+  verifies the certificate below it *and* that may issue: `basicConstraints` CA:TRUE (an old v1
+  self-signed root without constraints counts), `keyCertSign` when it has a key usage, a
+  `pathLenConstraint` that allows the CAs below it, and, given the signing time, validity then.
+  Certificates embedded in a document are in the pool too, so an ordinary subscriber certificate
+  can never vouch for another one; when an issuer is refused, the signature's details say why.
+
 Oracles: poppler's `pdfsig` reports our signatures valid; OpenSSL reads our `.p12` files and
 verifies our CMS; `tests/data/openssl-signed.pdf` is a signature OpenSSL made, which we validate.
