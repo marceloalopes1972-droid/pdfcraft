@@ -543,6 +543,7 @@ impl Automation {
             "accessibility_check" => self.a11y_check(&a)?,
             "ocr_recognize" => self.ocr_recognize(&a)?,
             "js_run" => self.js_run(&a)?,
+            "js_event" => self.js_event(&a)?,
             "js_document_scripts" => self.js_document_scripts(&a)?,
             "js_set_document_script" => self.js_set_document_script(&a)?,
             "js_enabled" => self.js_enabled(&a)?,
@@ -615,7 +616,11 @@ impl Automation {
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let id = self.session.open(name, Some(path.to_string_lossy().into_owned()), Arc::new(bytes), a.opt_str("password")?).map_err(failed)?;
         let doc = self.session.get(id).ok_or_else(|| failed("the document vanished"))?;
-        Ok(summary(doc))
+        let mut result = summary(doc);
+        let output = self.session.take_js_output(id);
+        let requests: Vec<_> = output.requests.iter().map(a11y::request_json).collect();
+        result["javascript"] = json!({ "alerts": output.alerts, "console": output.console, "requests": requests, "errors": output.errors });
+        Ok(result)
     }
 
     fn doc_close(&mut self, a: &Args) -> Result<Value> {
