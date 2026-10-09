@@ -148,6 +148,9 @@ impl PdfCraftApp {
             layout if crate::canvas::PageLayout::from_command(layout).is_some() => {
                 if let (Some(i), Some(layout)) = (active, crate::canvas::PageLayout::from_command(layout)) {
                     self.views[i].set_layout(layout);
+                    // The page display the user chose becomes the default for new documents
+                    // and survives a restart (#266).
+                    self.view_defaults.layout = layout;
                 }
             }
             "view.layout.cover" => {
@@ -162,6 +165,9 @@ impl PdfCraftApp {
                 if let Some(i) = active {
                     self.views[i].set_layout(layout);
                     self.views[i].set_fit(fit);
+                    // As above: the chosen page display becomes the default (#266).
+                    self.view_defaults.layout = layout;
+                    self.view_defaults.fit = fit;
                 }
             }
             "view.full_screen" => {

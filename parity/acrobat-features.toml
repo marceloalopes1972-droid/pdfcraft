@@ -3819,7 +3819,7 @@ status = "shipped"
 commands = ["comment.list"]
 tools = []
 evidence = ["crates/ui-egui/tests/comments.rs::make_current_properties_default"]
-notes = "colour, opacity and line width become the tool's defaults (canvas and Comments panel menus)"
+notes = "colour, opacity and line width become the tool's defaults (canvas and Comments panel menus) and survive a restart: the per-tool styles are persisted with the settings and restored through their clamping setters (#340)"
 
 [[feature]]
 id = "comment.author-identity"
@@ -9698,8 +9698,8 @@ milestone = "M14"
 status = "partial"
 commands = []
 tools = []
-evidence = ["crates/ui-egui/tests/view.rs::default_page_display_is_used_for_new_documents", "crates/ui-egui/tests/view.rs::default_zoom_is_used_for_new_documents", "crates/ui-egui/tests/view.rs::preferences_set_the_default_zoom"]
-notes = "Preferences ▸ Documents and view: Default page display and Default zoom (Fit to width, Zoom to page level or a percentage) for every new tab; a PDF that asks for a layout or zoom gets it. Missing: Acrobat's resolution, rendering and page-content options"
+evidence = ["crates/ui-egui/tests/view.rs::default_page_display_is_used_for_new_documents", "crates/ui-egui/tests/view.rs::default_zoom_is_used_for_new_documents", "crates/ui-egui/tests/view.rs::preferences_set_the_default_zoom", "crates/ui-egui/tests/view.rs::the_page_display_you_choose_becomes_the_default"]
+notes = "Preferences ▸ Documents and view: Default page display and Default zoom (Fit to width, Zoom to page level or a percentage) for every new tab; a PDF that asks for a layout or zoom gets it. The page display chosen in a document (View ▸ Page display) becomes the new default and survives a restart (#266). Missing: Acrobat's resolution, rendering and page-content options"
 
 [[feature]]
 id = "misc.prefs-documents"

@@ -268,6 +268,28 @@ fn default_page_display_is_used_for_new_documents() {
     assert_eq!(legacy.view_defaults.layout, PageLayout::Continuous);
 }
 
+/// The page display the user chooses in a document becomes the default for new documents and
+/// survives a restart (#266).
+#[test]
+fn the_page_display_you_choose_becomes_the_default() {
+    use pdfcraft_ui_egui::canvas::PageLayout;
+    let mut h = harness(&[]);
+    h.state_mut().execute("view.layout.single");
+    h.run_steps(2);
+    assert_eq!(h.state().views[0].layout, PageLayout::Single);
+    assert_eq!(h.state().view_defaults.layout, PageLayout::Single, "the choice becomes the default (#266)");
+    let saved = h.state().persist();
+    let mut fresh = PdfCraftApp::new();
+    fresh.restore(&saved);
+    assert_eq!(fresh.view_defaults.layout, PageLayout::Single);
+    fresh.open_bytes("other.pdf", None, PAGES.to_vec()).expect("opens");
+    assert_eq!(fresh.views[0].layout, PageLayout::Single, "a new document opens in the persisted display");
+    // Acrobat's view modes set both at once and both persist.
+    h.state_mut().execute("view.fit_one_page");
+    h.run_steps(2);
+    assert_eq!((h.state().view_defaults.layout, h.state().view_defaults.fit), (PageLayout::Single, pdfcraft_ui_egui::canvas::Fit::Page));
+}
+
 #[test]
 fn default_zoom_is_used_for_new_documents() {
     use pdfcraft_ui_egui::canvas::Fit;

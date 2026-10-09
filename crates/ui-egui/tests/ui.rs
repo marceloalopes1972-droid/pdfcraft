@@ -300,6 +300,28 @@ fn persistence_round_trips_and_tolerates_garbage() {
     assert_eq!(b.theme, pdfcraft_ui_egui::theme::ThemeKind::Dark);
 }
 
+/// Persisted per-tool comment styles go through their clamping setters: hostile or malformed
+/// values are clamped or ignored, never trusted (#340).
+#[test]
+fn comment_style_settings_clamp_and_refuse_hostile_values() {
+    use pdfcraft_ui_egui::comments::CommentTool;
+    let mut a = PdfCraftApp::new();
+    a.restore(
+        r#"{"comment_styles":[
+            {"tool":"comment.highlight","color":[2,-1,0.5],"opacity":99,"width":-4},
+            {"tool":"comment.note","color":"yellow","opacity":"none"},
+            {"tool":"comment.note","color":[0.1,null,0.3]},
+            {"tool":"bogus.command","color":[0,0,0]}
+        ]}"#,
+    );
+    // Out-of-range numbers are clamped into range.
+    let st = a.comment_prefs.style(CommentTool::Highlight);
+    assert_eq!((st.color, st.opacity, st.width), ([1.0, 0.0, 0.5], 1.0, 0.5));
+    // A malformed colour is refused whole: the tool keeps its default.
+    let note = a.comment_prefs.style(CommentTool::Note);
+    assert_eq!(note.color, [1.0, 0.82, 0.0], "the default colour stays");
+}
+
 #[test]
 fn zoom_keeps_the_point_under_the_cursor_still() {
     let mut h = harness(|app| {
