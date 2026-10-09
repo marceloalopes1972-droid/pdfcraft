@@ -48,3 +48,14 @@ ignore = [
 [[licenses.exceptions]]
 crate = "epaint_default_fonts"
 allow = ["OFL-1.1", "Ubuntu-font-1.0"]
+
+# Pinned interprocess 2.2.3's code-only dependencies. Both published LICENSE.txt files
+# were reviewed: 0BSD grants unrestricted use/copy/modify/distribute, with no copyleft.
+# Limit this to reviewed versions; do not broaden the general or asset allowlist.
+[[licenses.exceptions]]
+crate = "doctest-file@=1.1.1"
+allow = ["0BSD"]
+
+[[licenses.exceptions]]
+crate = "recvmsg@=1.0.0"
+allow = ["0BSD"]

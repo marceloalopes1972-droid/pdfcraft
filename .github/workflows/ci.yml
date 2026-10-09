@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      test_macos:
+        description: Include macOS tests for an explicit cross-platform validation
+        type: boolean
+        default: false
   schedule:
     - cron: "17 3 * * *" # nightly fuzzing
 
@@ -23,9 +28,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # No macOS on PRs, main or nightly: the org's 5 macOS slots are kept for release builds,
-        # and release.yml builds macOS (a failing release is fixed and rebuilt).
-        os: [ubuntu-latest, windows-latest]
+        # Keep macOS off routine runs; allow explicit validation without a separate workflow.
+        os: ${{ fromJSON(inputs.test_macos == true && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest", "windows-latest"]') }}
     steps:
       - uses: actions/checkout@v4
 

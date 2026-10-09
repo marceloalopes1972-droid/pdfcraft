@@ -471,6 +471,135 @@ fn files_and_quit_from_the_operating_system() {
 }
 
 #[test]
+fn os_open_batch_preserves_tabs_and_unsaved_work_and_consumes_each_path_once() {
+    use pdfcraft_engine::Edit;
+    use pdfcraft_ui_egui::OsEvent;
+
+    let dir = std::env::temp_dir().join(format!("pdfcraft-open-events-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let spaced = dir.join("file with spaces.pdf");
+    let unicode = dir.join("résumé 東京.pdf");
+    let missing = dir.join("missing.pdf");
+    std::fs::write(&spaced, FIXTURE).unwrap();
+    std::fs::write(&unicode, FIXTURE).unwrap();
+    let paths = vec![spaced.to_string_lossy().into_owned(), missing.to_string_lossy().into_owned(), unicode.to_string_lossy().into_owned()];
+    let queue = std::rc::Rc::new(std::cell::RefCell::new(vec![OsEvent::Open(paths)]));
+    let q = queue.clone();
+    let mut h = harness(move |app| {
+        app.open_bytes("existing.pdf", None, FIXTURE.to_vec()).unwrap();
+        let id = app.views[0].id;
+        app.session.apply(id, Edit::SetInfo { key: "Title".into(), value: "Unsaved title".into() }).unwrap();
+        app.os_events = Some(Box::new(move || q.borrow_mut().drain(..).collect()));
+    });
+    let app = h.state();
+    assert_eq!(app.views.len(), 3, "both valid paths open, while the missing path does not block the batch");
+    assert_eq!(app.active, Some(2));
+    assert!(app.session.get(app.views[0].id).is_some_and(|doc| doc.dirty), "the existing unsaved document remains open and dirty");
+    assert_eq!(app.session.get(app.views[1].id).unwrap().name, "file with spaces.pdf");
+    assert_eq!(app.session.get(app.views[2].id).unwrap().name, "résumé 東京.pdf");
+    h.run_steps(3);
+    assert_eq!(h.state().views.len(), 3, "the OS event batch is consumed once");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn os_open_batch_obeys_default_mode_and_preserves_closed_panel_and_tool_state() {
+    use pdfcraft_ui_egui::{LeftPanel, Mode, OsEvent};
+
+    let dir = std::env::temp_dir().join(format!("pdfcraft-open-mode-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("incoming.pdf");
+    std::fs::write(&path, FIXTURE).unwrap();
+    let path = path.to_string_lossy().into_owned();
+    let queue = std::rc::Rc::new(std::cell::RefCell::new(vec![OsEvent::Open(vec![path])]));
+    let q = queue.clone();
+    let h = harness(move |app| {
+        app.default_mode = Mode::Read;
+        app.set_option("left", "closed").unwrap();
+        app.os_events = Some(Box::new(move || q.borrow_mut().drain(..).collect()));
+    });
+    assert_eq!(h.state().mode, Mode::Read);
+    assert!(!h.state().left_open, "switching to the saved workspace must not reopen a closed panel");
+    std::fs::remove_dir_all(&dir).ok();
+
+    let tool_dir = std::env::temp_dir().join(format!("pdfcraft-open-tool-{}", std::process::id()));
+    std::fs::create_dir_all(&tool_dir).unwrap();
+    let tool_path = tool_dir.join("incoming.pdf");
+    std::fs::write(&tool_path, FIXTURE).unwrap();
+    let queue = std::rc::Rc::new(std::cell::RefCell::new(vec![OsEvent::Open(vec![tool_path.to_string_lossy().into_owned()])]));
+    let q = queue.clone();
+    let h = harness(move |app| {
+        app.set_option("tool", "export").unwrap();
+        app.os_events = Some(Box::new(move || q.borrow_mut().drain(..).collect()));
+    });
+    assert_eq!(h.state().mode, Mode::AllTools);
+    assert_eq!(h.state().left, LeftPanel::Tool("export"));
+    assert_eq!(h.state().views.len(), 1);
+    std::fs::remove_dir_all(&tool_dir).ok();
+}
+
+#[test]
+fn os_open_batch_keeps_explicit_session_mode_over_saved_default() {
+    use pdfcraft_ui_egui::{Mode, OsEvent};
+
+    let dir = std::env::temp_dir().join(format!("pdfcraft-open-override-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("incoming.pdf");
+    std::fs::write(&path, FIXTURE).unwrap();
+    let path = path.to_string_lossy().into_owned();
+    let queue = std::rc::Rc::new(std::cell::RefCell::new(vec![OsEvent::Open(vec![path])]));
+    let q = queue.clone();
+    let h = harness(move |app| {
+        app.default_mode = Mode::Read;
+        app.set_option("mode", "edit").unwrap();
+        app.os_events = Some(Box::new(move || q.borrow_mut().drain(..).collect()));
+    });
+    assert_eq!(h.state().mode, Mode::Edit, "the explicit session mode takes precedence over the saved default");
+    assert_eq!(h.state().views.len(), 1);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn os_open_batch_follows_session_restore_without_replaying_it() {
+    use pdfcraft_ui_egui::{Mode, OsEvent};
+    let root = std::env::temp_dir().join(format!("pdfcraft-open-restored-session-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let paths: Vec<String> = ["restored.pdf", "startup.pdf", "forwarded.pdf"]
+        .into_iter()
+        .map(|name| {
+            let path = root.join(name);
+            std::fs::write(&path, FIXTURE).unwrap();
+            path.to_string_lossy().into_owned()
+        })
+        .collect();
+    let mut previous = PdfCraftApp::new();
+    previous.reopen_last_session = true;
+    previous.default_mode = Mode::Read;
+    previous.open_path(&paths[0]);
+    previous.open_path(&paths[1]);
+    let settings = previous.persist();
+    let expected = paths.clone();
+    let mut h = harness(move |app| {
+        app.restore(&settings);
+        app.reopen_last_files(&[paths[1].clone()]);
+        app.open_path(&paths[1]);
+        // Match desktop startup: explicit options are applied before the first event poll.
+        app.set_option("mode", "edit").unwrap();
+        app.set_option("left", "closed").unwrap();
+        let mut pending = vec![OsEvent::Open(vec![paths[2].clone()])];
+        app.os_events = Some(Box::new(move || std::mem::take(&mut pending)));
+    });
+    let opened = |app: &PdfCraftApp| app.views.iter().map(|v| app.session.get(v.id).unwrap().path.clone().unwrap()).collect::<Vec<_>>();
+    assert_eq!(opened(h.state()), expected);
+    assert_eq!(h.state().mode, Mode::Edit);
+    assert!(!h.state().left_open);
+    assert_eq!(h.state().active, Some(2));
+    h.run_steps(3);
+    assert_eq!(opened(h.state()), expected, "later frames must not replay startup or the incoming batch");
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn default_workspace_mode_persists_and_tolerates_invalid_settings() {
     use pdfcraft_ui_egui::Mode;
     for mode in [Mode::AllTools, Mode::Read, Mode::Edit, Mode::Convert, Mode::Sign] {

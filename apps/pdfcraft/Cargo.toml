@@ -28,6 +28,13 @@ log = { workspace = true }
 # behind a safe API. Same version as PhotoCraft. Pinned exactly: review the diff before bumping.
 fmv-macos-events = "=0.1.0"
 
+[target.'cfg(windows)'.dependencies]
+# Safe named pipes with explicit ACLs and nonblocking I/O; reviewed version kept pinned.
+interprocess = "=2.2.3"
+widestring = "1"
+sha2 = "0.11"
+rfd = { workspace = true }
+
 [build-dependencies]
 # Icon + VERSIONINFO for pdfcraft.exe; build.rs only uses it when targeting Windows.
 winresource = "0.1"

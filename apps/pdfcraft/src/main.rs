@@ -27,7 +27,11 @@ use pdfcraft_ui_egui::PdfCraftApp;
 #[cfg(target_os = "macos")]
 mod apple_events;
 mod logging;
+#[cfg(any(windows, test))]
+mod open_protocol;
 mod updates;
+#[cfg(windows)]
+mod windows_instance;
 
 /// Freedesktop app id: the `.desktop` file name and the hicolor icon name.
 const APP_ID: &str = "ai.storyteller.pdfcraft";
@@ -66,6 +70,10 @@ fn migrate_legacy_folders() {
         let local = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()).map(std::path::PathBuf::from);
         moves.push((local.as_ref().map(|d| d.join("PrintCraft")), local.map(|d| d.join("PdfCraft"))));
     }
+    migrate_folders(moves);
+}
+
+fn migrate_folders(moves: impl IntoIterator<Item = (Option<std::path::PathBuf>, Option<std::path::PathBuf>)>) {
     for (old, new) in moves {
         let (Some(old), Some(new)) = (old, new) else { continue };
         if !old.is_dir() || new.exists() {
@@ -136,7 +144,15 @@ fn main() -> eframe::Result {
     let mut options: Vec<(String, String)> = Vec::new();
     let mut control_file: Option<String> = None;
     let mut create_images = false;
+    #[cfg(not(windows))]
     let mut args = std::env::args().skip(1);
+    #[cfg(windows)]
+    let mut args = std::env::args_os()
+        .skip(1)
+        .map(|arg| arg.into_string().map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "PdfCraft requires Unicode document paths")))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(windows_launch_error)?
+        .into_iter();
     while let Some(a) = args.next() {
         match a.as_str() {
             "--version" => {
@@ -154,6 +170,13 @@ fn main() -> eframe::Result {
     }
     let integrated = cfg!(target_os = "macos");
     migrate_legacy_folders();
+    #[cfg(windows)]
+    let windows_instance = match start_windows_instance(&files, create_images, settings_dir()) {
+        Ok(WindowsLaunch::Primary(instance)) => Some(instance),
+        Ok(WindowsLaunch::Independent) => None,
+        Ok(WindowsLaunch::Forwarded) => return Ok(()),
+        Err(error) => return Err(windows_launch_error(error)),
+    };
     // The log file lives in the settings folder; opened after the arguments (so `--version` leaves
     // no file behind) and after the PrintCraft migration (which a fresh folder would block).
     // Records logged until now are written to it first.
@@ -172,34 +195,36 @@ fn main() -> eframe::Result {
     let apple_events = apple_events::AppleEvents::install();
     // Set once the app is created, which is after the renderer has started.
     let started = Rc::new(Cell::new(false));
+    // The instance guard belongs to this launch, not either renderer attempt. App creators
+    // only borrow it; a discarded creator cannot drop the listener or drain its pending inbox.
+    run_with_renderer_fallback(choice, &started, |renderer| {
+        eframe::run_native(
+            "PdfCraft",
+            native_options(integrated, renderer),
+            app_creator(
+                launch.clone(),
+                Rc::clone(&started),
+                #[cfg(target_os = "macos")]
+                &apple_events,
+                #[cfg(windows)]
+                windows_instance.as_ref(),
+            ),
+        )
+    })
+}
+
+/// One launch may try two renderers, but never retries after creating an app. Keeping the
+/// runner injectable exercises this control flow without requiring a broken GPU or display.
+fn run_with_renderer_fallback(
+    choice: RendererChoice,
+    started: &Cell<bool>,
+    mut run: impl FnMut(eframe::Renderer) -> eframe::Result,
+) -> eframe::Result {
     let first = if choice == RendererChoice::Gl { eframe::Renderer::Glow } else { eframe::Renderer::Wgpu };
-    let result = eframe::run_native(
-        "PdfCraft",
-        native_options(integrated, first),
-        app_creator(
-            launch.clone(),
-            Rc::clone(&started),
-            #[cfg(target_os = "macos")]
-            &apple_events,
-        ),
-    );
-    match result {
-        // Only a renderer that couldn't start: without a window or display at all, OpenGL can't
-        // help either, and winit's own error says more.
+    match run(first) {
         Err(e @ eframe::Error::Wgpu(_)) if retry_with_gl(choice, started.get()) => {
-            // Old or unusual GPUs and drivers (#461, #435, #392) can't give wgpu a device; OpenGL
-            // usually still works there, so that's better than quitting.
             log::error!("the GPU renderer (wgpu) didn't start: {e}. Starting with OpenGL instead; set PDFCRAFT_RENDERER=gl to skip wgpu.");
-            eframe::run_native(
-                "PdfCraft",
-                native_options(integrated, eframe::Renderer::Glow),
-                app_creator(
-                    launch,
-                    started,
-                    #[cfg(target_os = "macos")]
-                    &apple_events,
-                ),
-            )
+            run(eframe::Renderer::Glow)
         }
         other => other,
     }
@@ -270,6 +295,7 @@ fn app_creator<'a>(
     launch: Launch,
     started: Rc<Cell<bool>>,
     #[cfg(target_os = "macos")] apple_events: &'a apple_events::AppleEvents,
+    #[cfg(windows)] windows_instance: Option<&'a windows_instance::WindowsInstance>,
 ) -> eframe::AppCreator<'a> {
     let Launch { files, options, control_file, create_images, integrated } = launch;
     Box::new(move |cc| {
@@ -284,6 +310,10 @@ fn app_creator<'a>(
         #[cfg(target_os = "macos")]
         {
             app.os_events = Some(apple_events.connect(&cc.egui_ctx));
+        }
+        #[cfg(windows)]
+        if let Some(instance) = windows_instance {
+            attach_windows_events(&mut app, instance, &cc.egui_ctx);
         }
         if let Some(file) = &control_file {
             let client = app.attach_control(&cc.egui_ctx);
@@ -323,6 +353,58 @@ fn app_creator<'a>(
         }
         Ok(Box::new(app))
     })
+}
+
+#[cfg(windows)]
+fn windows_launch_error(error: std::io::Error) -> eframe::Error {
+    // Release builds have no console. Native diagnostics run before UI language initialization.
+    rfd::MessageDialog::new()
+        .set_title("PdfCraft could not hand off the documents")
+        .set_description(format!("{error}\n\nCheck the existing PdfCraft window before retrying: the documents may already be queued. Use the same Windows account and elevation for both launches."))
+        .set_level(rfd::MessageLevel::Error)
+        .show();
+    eframe::Error::AppCreation(Box::new(error))
+}
+
+#[cfg(windows)]
+enum WindowsLaunch {
+    Primary(windows_instance::WindowsInstance),
+    Forwarded,
+    Independent,
+}
+
+#[cfg(windows)]
+fn start_windows_instance(files: &[String], create_images: bool, profile: Option<std::path::PathBuf>) -> std::io::Result<WindowsLaunch> {
+    // Image creation is a different workflow, not a request to open PDFs. Preserve upstream's
+    // independent image-import window without registering another document listener.
+    if create_images {
+        return Ok(WindowsLaunch::Independent);
+    }
+    let profile = profile.ok_or_else(|| std::io::Error::other("Windows settings profile is unavailable"))?;
+    let paths = open_protocol::absolute_paths(files)?;
+    std::fs::create_dir_all(&profile)?;
+    // Resolve aliases before hashing so the pipe name and the OS-held lock identify the same
+    // profile. This is also the portable settings directory used for app.ron and recovery.
+    let profile = std::fs::canonicalize(profile)?;
+    match windows_instance::WindowsInstance::start(&windows_instance::endpoint(&profile), &profile.join("document-open.lock"), &paths)? {
+        Some(instance) => Ok(WindowsLaunch::Primary(instance)),
+        None => Ok(WindowsLaunch::Forwarded),
+    }
+}
+
+#[cfg(windows)]
+fn attach_windows_events(app: &mut PdfCraftApp, instance: &windows_instance::WindowsInstance, ctx: &egui::Context) {
+    let wake_ctx = ctx.clone();
+    let mut poll = instance.connect(move || wake_ctx.request_repaint());
+    let ctx = ctx.clone();
+    app.os_events = Some(Box::new(move || {
+        let batches = poll();
+        if !batches.is_empty() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        }
+        batches.into_iter().map(pdfcraft_ui_egui::OsEvent::Open).collect()
+    }));
 }
 
 /// Write the control endpoint so that only the current user can read the token.
@@ -514,6 +596,221 @@ fn pick_adapter(adapters: &[(u32, u32, eframe::wgpu::DeviceType)], displays: &[D
 
 #[cfg(test)]
 mod tests {
+    fn renderer_failure() -> eframe::Error {
+        eframe::Error::Wgpu(eframe::egui_wgpu::WgpuError::NoSurfaceFormatsAvailable)
+    }
+
+    #[test]
+    fn renderer_runner_retries_only_an_unstarted_automatic_wgpu_failure() {
+        use super::{RendererChoice, run_with_renderer_fallback};
+        for (choice, started, gpu_error, expected) in [
+            (RendererChoice::Auto, false, true, 2),
+            (RendererChoice::Auto, true, true, 1),
+            (RendererChoice::Wgpu, false, true, 1),
+            (RendererChoice::Gl, false, true, 1),
+            (RendererChoice::Auto, false, false, 1),
+        ] {
+            let started = std::cell::Cell::new(started);
+            let mut attempts = Vec::new();
+            let result = run_with_renderer_fallback(choice, &started, |renderer| {
+                attempts.push(renderer);
+                if attempts.len() == 2 {
+                    started.set(true);
+                    return Ok(());
+                }
+                Err(if gpu_error { renderer_failure() } else { eframe::Error::AppCreation(std::io::Error::other("injected startup failure").into()) })
+            });
+            assert_eq!(attempts.len(), expected);
+            assert_eq!(result.is_ok(), expected == 2);
+            assert_eq!(attempts[0], if choice == RendererChoice::Gl { eframe::Renderer::Glow } else { eframe::Renderer::Wgpu });
+            if expected == 2 {
+                assert_eq!(attempts[1], eframe::Renderer::Glow);
+            }
+        }
+        let mut attempts = 0;
+        run_with_renderer_fallback(RendererChoice::Auto, &std::cell::Cell::new(false), |_| {
+            attempts += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(attempts, 1, "successful first initialization must not retry");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_renderer_fallback_keeps_owner_and_drains_queued_batches_once() {
+        use super::{Launch, RendererChoice, WindowsLaunch, app_creator, attach_windows_events, run_with_renderer_fallback, start_windows_instance};
+        let root = std::env::temp_dir().join(format!("pdfcraft-renderer-retry-{}", std::process::id()));
+        let WindowsLaunch::Primary(owner) = start_windows_instance(&[], false, Some(root.clone())).unwrap() else { panic!("expected primary") };
+        let started = std::rc::Rc::new(std::cell::Cell::new(false));
+        let batches: Vec<Vec<String>> = (0..3)
+            .map(|i| {
+                vec![
+                    root.join(format!("batch {i} a.pdf")).to_string_lossy().into_owned(),
+                    root.join(format!("batch {i} 日本語.pdf")).to_string_lossy().into_owned(),
+                ]
+            })
+            .collect();
+        let mut app = pdfcraft_ui_egui::PdfCraftApp::new();
+        let mut attempts = 0;
+        run_with_renderer_fallback(RendererChoice::Auto, &started, |renderer| {
+            attempts += 1;
+            if attempts == 1 {
+                assert_eq!(renderer, eframe::Renderer::Wgpu);
+                // eframe discards the first creator when renderer initialization fails.
+                let launch = Launch { files: vec![], options: vec![], control_file: None, create_images: false, integrated: false };
+                drop(app_creator(launch, std::rc::Rc::clone(&started), Some(&owner)));
+                assert!(!started.get());
+                std::thread::scope(|scope| {
+                    let handles: Vec<_> = batches
+                        .iter()
+                        .take(2)
+                        .map(|batch| {
+                            let profile = root.clone();
+                            scope.spawn(move || {
+                                assert!(matches!(start_windows_instance(batch, false, Some(profile)).unwrap(), WindowsLaunch::Forwarded))
+                            })
+                        })
+                        .collect();
+                    for handle in handles {
+                        handle.join().unwrap();
+                    }
+                });
+                return Err(renderer_failure());
+            }
+            assert_eq!(renderer, eframe::Renderer::Glow);
+            assert!(
+                matches!(start_windows_instance(&batches[2], false, Some(root.clone())).unwrap(), WindowsLaunch::Forwarded),
+                "retry must retain the original owner"
+            );
+            started.set(true);
+            attach_windows_events(&mut app, &owner, &egui::Context::default());
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(attempts, 2);
+        let poll = app.os_events.as_mut().unwrap();
+        let mut received: Vec<Vec<String>> = poll()
+            .into_iter()
+            .map(|event| {
+                let pdfcraft_ui_egui::OsEvent::Open(paths) = event else { panic!("unexpected OS event") };
+                paths
+            })
+            .collect();
+        received.sort();
+        assert_eq!(received, batches, "each acknowledged batch survives both initialization attempts");
+        assert!(poll().is_empty(), "draining the inbox does not replay batches");
+        drop(app);
+        drop(owner);
+        assert!(matches!(start_windows_instance(&[], false, Some(root.clone())).unwrap(), WindowsLaunch::Primary(_)));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_terminal_renderer_failure_releases_the_launch_owner() {
+        use super::{RendererChoice, WindowsLaunch, run_with_renderer_fallback, start_windows_instance};
+        let root = std::env::temp_dir().join(format!("pdfcraft-renderer-terminal-{}", std::process::id()));
+        {
+            let WindowsLaunch::Primary(_owner) = start_windows_instance(&[], false, Some(root.clone())).unwrap() else { panic!("expected primary") };
+            let mut attempts = 0;
+            let result = run_with_renderer_fallback(RendererChoice::Auto, &std::cell::Cell::new(false), |_| {
+                attempts += 1;
+                assert!(matches!(start_windows_instance(&[], false, Some(root.clone())).unwrap(), WindowsLaunch::Forwarded));
+                Err(renderer_failure())
+            });
+            assert!(result.is_err());
+            assert_eq!(attempts, 2, "a failing fallback must be terminal");
+        }
+        // Pending in-memory batches can be lost on terminal startup failure, as documented.
+        // The OS lock and listener must nevertheless be released for the next normal launch.
+        let WindowsLaunch::Primary(owner) = start_windows_instance(&[], false, Some(root.clone())).unwrap() else {
+            panic!("terminal failure retained ownership")
+        };
+        assert!(owner.connect(|| {})().is_empty());
+        drop(owner);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_startup_separates_portable_profiles_and_normalizes_forwarded_paths() {
+        use super::{WindowsLaunch, start_windows_instance};
+        let root = std::env::temp_dir().join(format!("pdfcraft-startup-profiles-{}", std::process::id()));
+        let exe = root.join("portable-app");
+        std::fs::create_dir_all(&exe).unwrap();
+        std::fs::write(exe.join("portable.txt"), b"").unwrap();
+        let portable = pdfcraft_ui_egui::portable::resolve(Some(&exe)).dir.unwrap();
+        let installed = root.join("user-profile");
+        let WindowsLaunch::Primary(portable_owner) = start_windows_instance(&[], false, Some(portable.clone())).unwrap() else {
+            panic!("first portable launch must own its profile")
+        };
+        let WindowsLaunch::Primary(installed_owner) = start_windows_instance(&[], false, Some(installed.clone())).unwrap() else {
+            panic!("different profile must remain independent")
+        };
+        let mut portable_poll = portable_owner.connect(|| {});
+        let mut installed_poll = installed_owner.connect(|| {});
+        let document = root.join("two words 日本語.pdf");
+        let uri = format!("file:///{}", document.to_string_lossy().replace('\\', "/").replace(' ', "%20"));
+        let paths = vec![super::path_from_arg(uri), "relative document.pdf".into()];
+        let expected = super::open_protocol::absolute_paths(&paths).unwrap();
+        assert!(matches!(start_windows_instance(&paths, false, Some(portable.join("."))).unwrap(), WindowsLaunch::Forwarded));
+        assert_eq!(portable_poll(), vec![expected]);
+        assert!(installed_poll().is_empty());
+        assert!(matches!(start_windows_instance(&paths, false, Some(installed)).unwrap(), WindowsLaunch::Forwarded));
+        assert_eq!(installed_poll().len(), 1);
+        assert!(portable_poll().is_empty());
+        drop(portable_owner);
+        drop(installed_owner);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_startup_image_import_neither_claims_nor_forwards() {
+        use super::{WindowsLaunch, start_windows_instance};
+        let root = std::env::temp_dir().join(format!("pdfcraft-startup-images-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let images = vec!["scan.png".into(), "second scan.jpg".into()];
+        assert!(matches!(start_windows_instance(&images, true, None).unwrap(), WindowsLaunch::Independent));
+        assert!(matches!(start_windows_instance(&images, true, Some(root.clone())).unwrap(), WindowsLaunch::Independent));
+        assert!(!root.exists(), "image-only launch must not create an IPC profile");
+        let WindowsLaunch::Primary(owner) = start_windows_instance(&[], false, Some(root.clone())).unwrap() else {
+            panic!("image launch must not own the document endpoint")
+        };
+        let mut poll = owner.connect(|| {});
+        assert!(matches!(start_windows_instance(&images, true, Some(root.clone())).unwrap(), WindowsLaunch::Independent));
+        assert!(poll().is_empty(), "images must not be delivered as PDF opens");
+        assert!(matches!(start_windows_instance(&[], false, Some(root.clone())).unwrap(), WindowsLaunch::Forwarded));
+        assert_eq!(poll(), vec![Vec::<String>::new()], "ordinary empty launch still requests activation");
+        drop(owner);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_startup_without_a_profile_reports_an_error() {
+        assert!(super::start_windows_instance(&[], false, None).is_err());
+    }
+    #[test]
+    fn rename_migration_preserves_preferences_and_does_not_replace_new_settings() {
+        let root = std::env::temp_dir().join(format!("pdfcraft-migration-{}", std::process::id()));
+        let old = root.join("PrintCraft");
+        let new = root.join("PdfCraft");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("app.ron"), "legacy preferences").unwrap();
+        super::migrate_folders([(Some(old.clone()), Some(new.clone()))]);
+        assert_eq!(std::fs::read_to_string(new.join("app.ron")).unwrap(), "legacy preferences");
+        // Later launches see the new directory (including IPC state) and leave it intact.
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("app.ron"), "older preferences").unwrap();
+        super::migrate_folders([(Some(old.clone()), Some(new.clone()))]);
+        assert_eq!(std::fs::read_to_string(new.join("app.ron")).unwrap(), "legacy preferences");
+        assert!(old.exists());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn path_from_arg_decodes_file_uris() {
         assert_eq!(super::path_from_arg("file:///home/alice/report.pdf".to_string()), "/home/alice/report.pdf");
