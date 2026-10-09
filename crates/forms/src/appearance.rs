@@ -10,7 +10,7 @@
 //! visible. Widths use the approximate Helvetica metrics of `pdfcraft-fonts`.
 
 use pdfcraft_cos::{Dict, Document, Object, Stream};
-use pdfcraft_fonts::{helvetica_width, literal, win_ansi, wrap};
+use pdfcraft_fonts::{helvetica_width, literal, wrap};
 
 use crate::{Field, FieldKind, Widget, acroform, flags};
 
@@ -53,10 +53,89 @@ pub fn parse_da(da: &str) -> Da {
     out
 }
 
-/// The font resource for `name` from the form's `/DR`, if it is a simple font we can encode for.
-fn dr_font(doc: &Document, name: &str) -> Option<Object> {
-    let af = acroform(doc)?;
-    let dr = doc.resolve(af.get(b"DR")?);
+/// Encoder that maps WinAnsi characters directly and assigns codes in 1..=31 for
+/// non-WinAnsi characters supported by the Adobe Glyph List (such as Romanian ă, ș, ț).
+#[derive(Default)]
+pub(crate) struct AppearanceEncoder {
+    pub(crate) custom: std::collections::HashMap<char, u8>,
+    pub(crate) diffs: Vec<Object>,
+    next_code: u8,
+}
+
+impl AppearanceEncoder {
+    pub(crate) fn new() -> Self {
+        Self { custom: std::collections::HashMap::new(), diffs: Vec::new(), next_code: 1 }
+    }
+
+    pub(crate) fn encode(&mut self, text: &str) -> Vec<u8> {
+        let mut out = Vec::with_capacity(text.len());
+        for c in text.chars() {
+            let byte = match c {
+                '\u{20}'..='\u{7e}' => Some(c as u8),
+                '\u{a0}'..='\u{ff}' => Some(c as u32 as u8),
+                '€' => Some(0x80),
+                '‚' => Some(0x82),
+                'ƒ' => Some(0x83),
+                '„' => Some(0x84),
+                '…' => Some(0x85),
+                '†' => Some(0x86),
+                '‡' => Some(0x87),
+                'ˆ' => Some(0x88),
+                '‰' => Some(0x89),
+                'Š' => Some(0x8a),
+                '‹' => Some(0x8b),
+                'Œ' => Some(0x8c),
+                'Ž' => Some(0x8e),
+                '‘' => Some(0x91),
+                '’' => Some(0x92),
+                '“' => Some(0x93),
+                '”' => Some(0x94),
+                '•' => Some(0x95),
+                '–' => Some(0x96),
+                '—' => Some(0x97),
+                '˜' => Some(0x98),
+                '™' => Some(0x99),
+                'š' => Some(0x9a),
+                '›' => Some(0x9b),
+                'œ' => Some(0x9c),
+                'ž' => Some(0x9e),
+                'Ÿ' => Some(0x9f),
+                '\t' => Some(b' '),
+                _ => None,
+            };
+
+            if let Some(b) = byte {
+                out.push(b);
+            } else if let Some(&code) = self.custom.get(&c) {
+                out.push(code);
+            } else if let Some(glyph_name) = pdfcraft_fonts::unicode_to_adobe_glyph_name(c) {
+                if self.next_code < 32 {
+                    let code = self.next_code;
+                    self.next_code += 1;
+                    if self.diffs.is_empty() {
+                        self.diffs.push(Object::Int(1));
+                    }
+                    self.diffs.push(Object::name(glyph_name));
+                    self.custom.insert(c, code);
+                    out.push(code);
+                } else {
+                    out.push(b'?');
+                }
+            } else {
+                out.push(b'?');
+            }
+        }
+        out
+    }
+}
+
+/// The font resource for `name` from the widget or form's `/DR`, if it is a simple font we can encode for.
+fn dr_font(doc: &Document, wd: Option<&Dict>, name: &str) -> Option<Object> {
+    let dr = wd.and_then(|d| d.get(b"DR")).map(|d| doc.resolve(d)).or_else(|| {
+        let af = acroform(doc)?;
+        let dr = doc.resolve(af.get(b"DR")?);
+        Some(dr)
+    })?;
     let fonts = doc.resolve(dr.as_dict()?.get(b"Font")?);
     let entry = fonts.as_dict()?.get(name.as_bytes())?.clone();
     let font = doc.resolve(&entry);
@@ -72,12 +151,20 @@ fn dr_font(doc: &Document, name: &str) -> Option<Object> {
     Some(entry)
 }
 
-fn helvetica() -> Object {
+pub(crate) fn appearance_font(base_font: &str, diffs: Option<Vec<Object>>) -> Object {
     let mut f = Dict::new();
     f.set(b"Type".to_vec(), Object::name("Font"));
     f.set(b"Subtype".to_vec(), Object::name("Type1"));
-    f.set(b"BaseFont".to_vec(), Object::name("Helvetica"));
-    f.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
+    f.set(b"BaseFont".to_vec(), Object::name(base_font));
+    if let Some(diffs) = diffs {
+        let mut enc = Dict::new();
+        enc.set(b"Type".to_vec(), Object::name("Encoding"));
+        enc.set(b"BaseEncoding".to_vec(), Object::name("WinAnsiEncoding"));
+        enc.set(b"Differences".to_vec(), Object::Array(diffs));
+        f.set(b"Encoding".to_vec(), Object::Dict(enc));
+    } else {
+        f.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
+    }
     Object::Dict(f)
 }
 
@@ -194,18 +281,16 @@ pub fn field_appearance_as(doc: &Document, f: &Field, w: &Widget, values: &[Stri
     let wd = wobj.as_dict().cloned().unwrap_or_default();
     let (width, height) = ((w.rect[2] - w.rect[0]).max(1.0), (w.rect[3] - w.rect[1]).max(1.0));
     let da = parse_da(wd.get(b"DA").and_then(|o| doc.resolve(o).as_string().map(|s| s.to_text())).as_deref().unwrap_or(&f.da));
-    let (font_name, font_obj) = match dr_font(doc, &da.font) {
-        Some(o) => (da.font.clone(), o),
-        None => ("Helv".to_string(), helvetica()),
-    };
     let (mut c, bw) = frame(doc, &wd, width, height);
     let pad = 2.0 + bw;
     let inner_w = (width - 2.0 * pad).max(1.0);
     let q = wd.get(b"Q").and_then(|o| doc.resolve(o).as_int()).unwrap_or(f.quadding);
     let mut body: Vec<u8> = Vec::new();
-    let show = |body: &mut Vec<u8>, x: f64, y: f64, text: &str| {
+    let mut encoder = AppearanceEncoder::new();
+    let mut show = |body: &mut Vec<u8>, x: f64, y: f64, text: &str| {
         body.extend(format!("1 0 0 1 {} {} Tm ", n(x), n(y)).bytes());
-        body.extend(literal(&win_ansi(text)));
+        let encoded = encoder.encode(text);
+        body.extend(literal(&encoded));
         body.extend_from_slice(b" Tj\n");
     };
     let x_for = |text: &str, size: f64| -> f64 {
@@ -284,6 +369,20 @@ pub fn field_appearance_as(doc: &Document, f: &Field, w: &Widget, values: &[Stri
             }
         }
     }
+    let (font_name, font_obj) = if encoder.diffs.is_empty() {
+        match dr_font(doc, Some(&wd), &da.font) {
+            Some(o) => (da.font.clone(), o),
+            None => ("Helv".to_string(), appearance_font("Helvetica", None)),
+        }
+    } else {
+        let base_font = match da.font.to_ascii_lowercase().as_str() {
+            s if s.contains("tiro") || s.contains("times") => "Times-Roman",
+            s if s.contains("cour") || s.contains("mono") => "Courier",
+            _ => "Helvetica",
+        };
+        let font_name = if da.font.is_empty() { "Helv".to_string() } else { da.font.clone() };
+        (font_name, appearance_font(base_font, Some(encoder.diffs)))
+    };
     let mut content = c.into_bytes();
     content.extend(
         format!(

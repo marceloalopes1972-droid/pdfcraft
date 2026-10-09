@@ -443,6 +443,20 @@ pub fn fields(doc: &Document) -> Vec<Field> {
             walk(doc, r, &base, &page_of, &mut seen, &mut out, 0);
         }
     }
+    if out.is_empty() {
+        for p in &pages {
+            if let Some(a) = doc.get(*p).as_dict().and_then(|d| d.get(b"Annots").cloned()) {
+                for e in doc.resolve(&a).as_array().into_iter().flatten() {
+                    if let Some(r) = e.as_ref()
+                        && !seen.contains(&r)
+                        && doc.get(r).as_dict().is_some_and(|d| d.contains(b"FT") || d.contains(b"T") || d.name(b"Subtype") == Some(b"Widget"))
+                    {
+                        walk(doc, r, &base, &page_of, &mut seen, &mut out, 0);
+                    }
+                }
+            }
+        }
+    }
     rank_tabs(doc, &pages, &annot_index, &mut out);
     out
 }

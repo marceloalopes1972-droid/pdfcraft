@@ -377,12 +377,27 @@ impl<'a> Inspector<'a> {
             info.outline = self.outline_siblings(first, &mut seen, 0);
         }
         self.annotations(info);
-        if let Some(form) = catalog.get(b"AcroForm").ok().and_then(|o| self.dict(o))
-            && let Ok(fields) = form.get(b"Fields").and_then(|o| self.resolve(o).as_array())
-        {
+        if let Some(form) = catalog.get(b"AcroForm").ok().and_then(|o| self.dict(o)) {
             let mut seen = HashSet::new();
-            for f in fields {
-                self.field(f, None, &mut info.fields, &mut seen, 0);
+            if let Ok(fields) = form.get(b"Fields").and_then(|o| self.resolve(o).as_array()) {
+                for f in fields {
+                    self.field(f, None, &mut info.fields, &mut seen, 0);
+                }
+            }
+            if info.fields.is_empty() {
+                for &id in self.page_index.keys() {
+                    if let Ok(page_dict) = self.doc.get_dictionary(id)
+                        && let Ok(Object::Array(annots)) = page_dict.get(b"Annots").map(|o| self.resolve(o))
+                    {
+                        for a in annots {
+                            if let Some(d) = self.dict(a)
+                                && (d.has(b"FT") || d.has(b"T") || self.name(d, b"Subtype").as_deref() == Some("Widget"))
+                            {
+                                self.field(a, None, &mut info.fields, &mut seen, 0);
+                            }
+                        }
+                    }
+                }
             }
         }
         info.has_javascript |= info.fields.iter().any(|f| f.has_actions);

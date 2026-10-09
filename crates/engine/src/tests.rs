@@ -2108,3 +2108,33 @@ fn comments_without_appearances_are_drawn_but_not_saved() {
         assert!(reopened.get(r).as_dict().is_some_and(|d| !d.contains(b"AP")), "{r:?} is saved without /AP");
     }
 }
+
+#[test]
+fn form_field_with_romanian_characters_renders() {
+    let pdf_path = "/Users/dexter/.gemini/antigravity/brain/08229556-1b2d-483f-9849-c103919b5bc9/.user_uploaded/media_1791521277960_ed489e84.pdf";
+    let (bytes, field_name) = if let Ok(bytes) = std::fs::read(pdf_path) {
+        (bytes, "900_1_Text")
+    } else {
+        let pdf = "%PDF-1.7
+1 0 obj << /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 400 300] /Annots [5 0 R] >> endobj
+4 0 obj << /Fields [5 0 R] /DA (/Helv 12 Tf 0 g) /DR << /Font << /Helv 6 0 R >> >> >> endobj
+5 0 obj << /Type /Annot /Subtype /Widget /FT /Tx /T (city) /Rect [50 200 250 240] /P 3 0 R >> endobj
+6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj
+trailer << /Root 1 0 R >>
+%%EOF";
+        (pdf.as_bytes().to_vec(), "city")
+    };
+    let mut s = Session::new();
+    let id = s.open("sample.pdf", None, Arc::new(bytes), None).unwrap();
+    s.apply(id, Edit::SetFieldValue { name: field_name.into(), value: FieldValue::Text("Turnu Măgurele222".into()) }).unwrap();
+    let p = shown(&s, id, 0);
+    let dark = p.rgba.as_chunks::<4>().0.iter().filter(|c| c[0] < 128).count();
+    assert!(dark > 20, "page renders glyphs with content");
+    let doc = s.get(id).unwrap();
+    let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), Default::default());
+    let text = r.render(pdfcraft_render::RenderRequest { page: 0, kind: pdfcraft_render::RequestKind::Text, scale: 1.0, ..Default::default() });
+    let text_str: String = text.text.as_ref().map(|t| t.glyphs.iter().map(|g| g.text.as_str()).collect()).unwrap_or_default();
+    assert!(text_str.contains("Turnu Măgurele222"), "extracted text should have ă, got: {text_str}");
+}

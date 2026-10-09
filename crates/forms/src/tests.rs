@@ -121,6 +121,28 @@ fn text_fields_get_new_appearances() {
 }
 
 #[test]
+fn text_fields_with_romanian_diacritics_get_differences_in_appearance() {
+    let mut doc = fixture();
+    set_value(&mut doc, "address.city", &FieldValue::Text("Turnu Măgurele222".into())).unwrap();
+    let doc = reopen(&doc);
+    let all = fields(&doc);
+    assert_eq!(field(&all, "address.city").value, ["Turnu Măgurele222"]);
+    let w = &field(&all, "address.city").widgets[0];
+    let n = doc.get(w.obj).as_dict().unwrap().get(b"AP").unwrap().as_dict().unwrap().reference(b"N").unwrap();
+    let Object::Stream(s) = &*doc.get(n) else { panic!() };
+    let raw = s.decoded().unwrap();
+    assert!(!raw.windows(1).any(|x| x == b"?"), "no question marks in appearance");
+    let expected_substr = b"Turnu M\\001gurele222";
+    assert!(raw.windows(expected_substr.len()).any(|x| x == expected_substr), "abreve encoded as \\001");
+    let fonts = s.dict.get(b"Resources").unwrap().as_dict().unwrap().get(b"Font").unwrap().as_dict().unwrap();
+    let font_obj = fonts.get(b"Helv").unwrap().as_dict().unwrap();
+    let enc = font_obj.get(b"Encoding").unwrap().as_dict().unwrap();
+    let diffs = enc.get(b"Differences").unwrap().as_array().unwrap();
+    assert_eq!(diffs[0].as_int(), Some(1));
+    assert_eq!(diffs[1].as_name(), Some(b"abreve".as_slice()));
+}
+
+#[test]
 fn check_boxes_and_radios_switch_states() {
     let mut doc = fixture();
     set_value(&mut doc, "agree", &FieldValue::Check(true)).unwrap();
