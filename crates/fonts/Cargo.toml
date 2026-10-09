@@ -12,3 +12,5 @@ workspace = true
 pdfcraft-cos = { workspace = true }
 # Glyph outlines of the bundled script font (typed signatures); already in the tree via egui.
 skrifa = "0.44"
+# One line when an installed fallback face is found (system module).
+log = { workspace = true }
