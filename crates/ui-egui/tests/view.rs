@@ -763,10 +763,11 @@ fn required_fields_get_a_red_border_when_highlighting() {
     assert!(px[0] > 180 && px[1] < 100 && px[2] < 100, "a red border: {px:?}");
 }
 
-/// The page raster is shown texel for texel. At a zoom whose device scale isn't on the old 1/64
-/// grid (87 % at 1 px per point: 1.16, rendered at 1.15625) the page was rendered at the
-/// quantized scale and stretched onto a rectangle that didn't start on a whole pixel, so every
-/// line and glyph was resampled and looked soft (#260, page 9).
+/// The page on screen matches a raster at the view's scale. At a zoom whose device scale isn't
+/// on the old 1/64 grid (87 % at 1 px per point: 1.16, rendered at 1.15625) the page was rendered
+/// at the quantized scale and stretched onto a rectangle that didn't start on a whole pixel, so
+/// every line and glyph was resampled and looked soft (#260, page 9). When the page is small
+/// enough, that raster is twice the screen density and filtered down.
 #[test]
 fn page_raster_maps_one_to_one_onto_screen_pixels() {
     let _gpu = gpu();
@@ -806,8 +807,9 @@ trailer << /Root 1 0 R >>
     }
 }
 
-/// Mean and largest difference between page 1 on screen and the page rendered directly at the
-/// view's exact device scale, over the lined area of `page_raster_maps_one_to_one_onto_screen_pixels`.
+/// Mean and largest difference between page 1 on screen and the page rendered at the view's
+/// scale, over the lined area of `page_raster_maps_one_to_one_onto_screen_pixels`. A doubled
+/// raster is box-filtered down to screen pixels (what the display does at exact 2×).
 fn compare_page_with_raster(h: &mut Harness<'static, PdfCraftApp>, pdf: &[u8], zoom: f32) -> (f64, u8) {
     for _ in 0..100 {
         h.run_steps(2);
@@ -819,16 +821,22 @@ fn compare_page_with_raster(h: &mut Harness<'static, PdfCraftApp>, pdf: &[u8], z
     let ppp = h.ctx.pixels_per_point();
     let r = rect(h, 0).expect("page 1");
     let img = h.render().expect("renders");
-    let scale = zoom * 96.0 / 72.0 * ppp;
+    let device = zoom * 96.0 / 72.0 * ppp;
+    let scale = pdfcraft_ui_egui::canvas::whole_page_scale(device, 400.0);
     let mut renderer = pdfcraft_render::PageRenderer::new(std::sync::Arc::new(pdf.to_vec()), pdfcraft_render::RenderConfig::default());
     let page = renderer.render(pdfcraft_render::RenderRequest { page: 0, kind: pdfcraft_render::RequestKind::Pixels, tile: None, scale, tag: 0 });
     assert!(page.error.is_none(), "{:?}", page.error);
+    let factor = (scale / device).round().max(1.0) as u32;
     // Compare the lined area (page x 40..270 pt, y 60..330 pt from the top), screen against raster.
     let (ox, oy) = ((r.min.x * ppp).round() as i64, (r.min.y * ppp).round() as i64);
     let (mut sum, mut worst, mut n) = (0u64, 0u8, 0u64);
-    for py in (60.0 * scale) as u32..(330.0 * scale) as u32 {
-        for px in (40.0 * scale) as u32..(270.0 * scale) as u32 {
-            let want = page.rgba[((py * page.width + px) * 4) as usize];
+    for py in (60.0 * device) as u32..(330.0 * device) as u32 {
+        for px in (40.0 * device) as u32..(270.0 * device) as u32 {
+            let want = if factor == 1 {
+                page.rgba[((py * page.width + px) * 4) as usize]
+            } else {
+                box_down(&page.rgba, page.width, px * factor, py * factor, factor)
+            };
             let got = img.get_pixel((ox + px as i64) as u32, (oy + py as i64) as u32)[0];
             let d = want.abs_diff(got);
             sum += u64::from(d);
@@ -837,6 +845,23 @@ fn compare_page_with_raster(h: &mut Harness<'static, PdfCraftApp>, pdf: &[u8], z
         }
     }
     (sum as f64 / n as f64, worst)
+}
+
+/// Average of the `factor`×`factor` block whose top-left texel is `(x, y)`.
+fn box_down(rgba: &[u8], width: u32, x: u32, y: u32, factor: u32) -> u8 {
+    let (mut sum, mut n) = (0u32, 0u32);
+    for dy in 0..factor {
+        for dx in 0..factor {
+            let (px, py) = (x + dx, y + dy);
+            if px < width
+                && let Some(v) = rgba.get((((py * width) + px) * 4) as usize)
+            {
+                sum += u32::from(*v);
+                n += 1;
+            }
+        }
+    }
+    (sum / n.max(1)) as u8
 }
 
 #[test]

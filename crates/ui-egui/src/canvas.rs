@@ -29,11 +29,19 @@ const GRID_TAG: u64 = 1 << 61;
 const STALE_TAG: u64 = u64::MAX;
 /// Pages whose raster would exceed this many device pixels on a side are drawn in tiles.
 const TILE_THRESHOLD: f32 = 4096.0;
+/// A whole-page raster may be drawn at twice the screen density up to this side, then filtered
+/// down into the page rectangle. Past it the page stays one screen pixel per sample (or tiles).
+const SUPERSAMPLE_LIMIT: f32 = 8192.0;
 const TILE: u32 = 1024;
-/// Longest side of the low-resolution backdrop drawn under tiles.
-const BASE_SIDE: f32 = 2048.0;
-const THUMB_W: f32 = 132.0;
-const THUMB_H: f32 = 176.0;
+/// Longest side of the backdrop drawn under tiles, and of a live page preview (signature drag).
+pub(crate) const BASE_SIDE: f32 = 4096.0;
+/// Print-preview rasters (distinct from thumbnails and from organize-grid renders).
+const PRINT_TAG: u64 = 1 << 60;
+/// Thumbnail slot before density scaling. The pages panel draws at most 150 logical points and
+/// the organize grid about 146; when the byte budget allows, density reaches the screen so those
+/// images are sampled down instead of stretched.
+const THUMB_W: f32 = 240.0;
+const THUMB_H: f32 = 320.0;
 const THUMB_BYTES: usize = 24 * 1024 * 1024;
 const PAGE_BYTES: usize = 128 * 1024 * 1024;
 const TILE_BYTES: usize = 128 * 1024 * 1024;
@@ -272,6 +280,8 @@ pub struct DocView {
     frame_visible: HashSet<usize>,
     /// Thumbnails that are out of date (still shown until their replacement arrives).
     stale_thumbs: HashSet<usize>,
+    /// Print dialog: the current sheet's pages at the preview pane's device resolution.
+    print_pages: HashMap<usize, (u64, TextureHandle)>,
     /// Sharp tiles of large pages: (page, scale tag, tile x, tile y) → texture. Tiles of an
     /// earlier zoom stay, drawn stretched, until those of the current one cover the page.
     tiles: HashMap<(usize, u64, u32, u32), TextureHandle>,
@@ -468,6 +478,7 @@ impl DocView {
             frame_queue: Vec::new(),
             frame_visible: HashSet::new(),
             stale_thumbs: HashSet::new(),
+            print_pages: HashMap::new(),
             tiles: HashMap::new(),
             texts: HashMap::new(),
             text_failed: HashSet::new(),
@@ -602,6 +613,9 @@ impl DocView {
             p.tag = STALE_TAG;
         }
         self.stale_thumbs.extend(self.thumbs.keys().copied());
+        for slot in self.print_pages.values_mut() {
+            slot.0 = STALE_TAG;
+        }
         // Pages may have moved: a sharp render of another page would be worse than a soft one.
         self.grid_pages.clear();
         self.tiles.clear();
@@ -625,6 +639,9 @@ impl DocView {
         }
         if self.thumbs.contains_key(&page) {
             self.stale_thumbs.insert(page);
+        }
+        if let Some(slot) = self.print_pages.get_mut(&page) {
+            slot.0 = STALE_TAG;
         }
         self.tiles.retain(|(p, _, _, _), _| *p != page);
         self.texts.remove(&page);
@@ -659,9 +676,15 @@ impl DocView {
         (!quads.is_empty()).then_some((s.page, quads))
     }
 
-    /// A page's thumbnail texture, when rendered (the print preview uses them).
+    /// A page's thumbnail texture, when rendered.
     pub(crate) fn thumb_id(&self, page: usize) -> Option<egui::TextureId> {
         self.thumbs.get(&page).map(|t| t.tex.id())
+    }
+
+    /// The print preview's picture of `page`: the sheet raster when it has arrived, otherwise the
+    /// thumbnail.
+    pub(crate) fn page_preview(&self, page: usize) -> Option<egui::TextureId> {
+        self.print_pages.get(&page).map(|(_, tex)| tex.id()).or_else(|| self.thumb_id(page))
     }
 
     pub(crate) fn page_text(&self, page: usize) -> Option<Arc<PageText>> {
@@ -1073,6 +1096,7 @@ impl DocView {
         self.tiles.clear();
         self.thumbs.clear();
         self.grid_pages.clear();
+        self.print_pages.clear();
         self.stale_thumbs.clear();
         self.waiting_since.clear();
         // Signature previews own a separate renderer and image/background textures.
@@ -1122,6 +1146,13 @@ impl DocView {
             // Organize-grid renders: only the cells in view that need one (organize_grid).
             if req.tag & GRID_TAG != 0 {
                 grid.push(*req);
+                continue;
+            }
+            // Print-preview rasters: a few sheets at the pane's size (the dialog bounds them).
+            if req.tag & PRINT_TAG != 0 {
+                if !self.errors.contains_key(&req.page) {
+                    queue.push(*req);
+                }
                 continue;
             }
             // On-screen work is always admitted (the viewport bounds it); the limits only
@@ -1255,6 +1286,9 @@ impl DocView {
         if let Some(t) = r.request.tile {
             let tex = ctx.load_texture(format!("tile-{:?}-{page}-{}-{}", self.id, t.x, t.y), img, TextureOptions::LINEAR);
             self.tiles.insert((page, r.request.tag, t.x / TILE, t.y / TILE), tex);
+        } else if r.request.tag & PRINT_TAG != 0 {
+            let tex = ctx.load_texture(format!("print-{:?}-{page}", self.id), img, TextureOptions::LINEAR);
+            self.print_pages.insert(page, (r.request.tag, tex));
         } else if r.request.tag & GRID_TAG != 0 {
             let tex = ctx.load_texture(format!("grid-{:?}-{page}", self.id), img, TextureOptions::LINEAR);
             self.grid_pages.insert(page, (r.width, tex));
@@ -1277,8 +1311,9 @@ impl DocView {
         // An on-screen page or tile is always taken (the viewport bounds it): it may evict
         // off-screen rasters but never another on-screen one, and is never refused.
         let visible = req.tag & THUMB_TAG == 0 && self.frame_visible.contains(&req.page);
-        // Organize-grid renders are bounded by the cells in view (organize_grid).
-        if req.tag & GRID_TAG != 0 {
+        // Organize-grid renders are bounded by the cells in view (organize_grid). Print
+        // previews are the sheets around the one on screen.
+        if req.tag & (GRID_TAG | PRINT_TAG) != 0 {
             return true;
         }
         if let Some(t) = req.tile {
@@ -1366,15 +1401,37 @@ impl DocView {
     }
 
     fn render_scale(&self, ppp: f32) -> f32 {
-        // Exactly the device scale: a raster at any other scale is resampled on screen, which
-        // blurs every line and glyph (#260).
+        // Screen pixels per PDF point. A whole-page raster may be drawn at twice this and filtered
+        // down ([`whole_page_scale`]). Any other scale is resampled and looks soft (#260).
         self.zoom * PT * ppp
+    }
+
+    /// Queue sharp rasters for the print preview. Pages that leave the nearby sheets are dropped.
+    pub(crate) fn queue_print_previews(&mut self, pages: &[(usize, f32)]) {
+        self.print_pages.retain(|page, _| pages.iter().any(|(p, _)| p == page));
+        for &(page, scale) in pages {
+            if self.errors.contains_key(&page) || !scale.is_finite() || scale <= 0.0 {
+                continue;
+            }
+            let tag = scale_tag(scale) | PRINT_TAG;
+            let fresh = self.print_pages.get(&page).is_some_and(|(have, _)| *have == tag);
+            if !fresh {
+                self.frame_queue.push(RenderRequest { page, kind: RequestKind::Pixels, tile: None, scale, tag });
+            }
+        }
     }
 }
 
 /// The request tag for a raster at `scale`: equal tags mean the same scale (to 1/65536).
 fn scale_tag(scale: f32) -> u64 {
     (f64::from(scale) * 65536.0).round() as u64
+}
+
+/// Scale for a whole-page raster. Twice the screen density when the bitmap still fits in
+/// 8192 px on its long side; otherwise exactly the screen density, so it maps texel for texel.
+pub fn whole_page_scale(device: f32, long_pt: f32) -> f32 {
+    let sharp = device * 2.0;
+    if long_pt.max(1.0) * sharp <= SUPERSAMPLE_LIMIT { sharp } else { device }
 }
 
 /// The scale of a raster tagged by [`scale_tag`].
@@ -1650,6 +1707,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         app.views[index].auto_scroll.cancel();
         ui.centered_and_justified(|ui| ui.label(tl!("This document has no pages.")));
         return;
+    }
+    // The print dialog queues its own rasters later in the frame. Closing it drops them.
+    if app.dialog != Some(crate::Dialog::Print) {
+        app.views[index].print_pages.clear();
     }
     // The Prepare a form panel is open (or a field tool is picked): fields are edited, not filled.
     let preparing = app.is_preparing();
@@ -1928,16 +1989,19 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 painter.galley(pos2(r.center().x - msg.size().x / 2.0, r.center().y), msg, Color32::BLACK);
             } else {
                 let (pw_pt, ph_pt) = (info.pages[i].width.max(1.0), info.pages[i].height.max(1.0));
+                let long_pt = pw_pt.max(ph_pt);
                 // A GPU may take smaller textures than these (OpenGL drivers report as little as
                 // 2048 pixels, and uploading a bigger one aborts), so both stay within its limit.
-                let max_side = ui.ctx().input(|inp| inp.max_texture_side) as f32;
-                let tiled = pw_pt.max(ph_pt) * scale > TILE_THRESHOLD.min(max_side);
-                // Whole-page raster: sharp when small, a low-res backdrop when tiled.
+                let max_side = (ui.ctx().input(|inp| inp.max_texture_side) as f32).max(1.0);
+                let tiled = long_pt * scale > TILE_THRESHOLD.min(max_side);
+                // Whole-page raster: above screen density when it fits, a backdrop when tiled.
+                let page_scale = whole_page_scale(scale, long_pt).min(max_side / long_pt);
+                let supersampled = !tiled && page_scale > scale;
                 let (want_scale, want_tag) = if tiled {
                     let bs = BASE_SIDE.min(max_side) / pw_pt.max(ph_pt);
                     (bs, scale_tag(bs))
                 } else {
-                    (scale, tag)
+                    (page_scale, scale_tag(page_scale))
                 };
                 // Under tiles, a whole-page raster sharper than the backdrop (from before the page
                 // grew past the tiling size) is a better backdrop: keep demanding it as it is.
@@ -1947,10 +2011,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                 }
                 match view.pages.get(&i) {
                     Some(p) => {
-                        if !tiled && p.tag == want_tag {
+                        if !tiled && p.tag == want_tag && !supersampled {
                             xf.texel_aligned(p.tex.size(), ppp).paint_image(painter, p.tex.id(), 0.0, 0.0, 1.0, 1.0);
                         } else {
-                            // A backdrop, or a raster at an older scale until the new one arrives.
+                            // Supersampled (filtered down into the page), a backdrop, or a raster
+                            // at an older scale until the new one arrives.
                             xf.paint_image(painter, p.tex.id(), 0.0, 0.0, 1.0, 1.0);
                         }
                     }
@@ -3860,6 +3925,18 @@ trailer << /Root 1 0 R >>
     /// One mouse-wheel notch (a line) at `at` seconds.
     fn notch(v: &mut DocView, dy: f32, at: f64) -> bool {
         v.single_page_wheel(egui::MouseWheelUnit::Line, dy, egui::TouchPhase::Move, at, true)
+    }
+
+    #[test]
+    fn thumbnails_cover_the_panel_on_a_high_dpi_screen() {
+        // Pages panel slot is at most 150 logical points. At 2 px/pt a letter page's thumbnail
+        // must be at least that wide, so the panel samples it down instead of stretching it.
+        let info = thumbnail_info(1);
+        let mut v = DocView::new(DocId(1), &info, ViewDefaults::default());
+        v.need_thumbnail(0, true);
+        let queue = v.prepare_render_queue(&info, 2.0);
+        let scale = queue.first().expect("one thumbnail").scale;
+        assert!(612.0 * scale >= 150.0 * 2.0, "{scale}");
     }
 
     #[test]

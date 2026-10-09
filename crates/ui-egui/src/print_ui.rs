@@ -9,6 +9,12 @@ use pdfcraft_engine::print::{self, Binding, BookletSubset, Content, Layout, Orie
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, widgets};
 
+/// The preview pane, and the paper inside it (12 pt inset on each side).
+const PREVIEW_W: f32 = 320.0;
+const PREVIEW_H: f32 = 380.0;
+const PREVIEW_INSET: f32 = 12.0;
+pub(crate) const PREVIEW_BOX: (f32, f32) = (PREVIEW_W - 2.0 * PREVIEW_INSET, PREVIEW_H - 2.0 * PREVIEW_INSET);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Which {
     All,
@@ -267,6 +273,45 @@ impl PdfCraftApp {
             }
         }
     }
+}
+
+/// Pages on the current sheet and its neighbours, each with the device pixels per point that
+/// fill the preview pane (so the picture is not a stretched thumbnail).
+pub(crate) fn preview_rasters(d: &PrintDraft, sizes: &[(f64, f64)], labels: &[String], ppp: f32) -> Vec<(usize, f32)> {
+    let Ok(settings) = d.settings(sizes.len(), labels) else { return Vec::new() };
+    let Ok(sheets) = print::layout(sizes, &settings) else { return Vec::new() };
+    if sheets.is_empty() {
+        return Vec::new();
+    }
+    let ppp = if ppp.is_finite() { ppp.max(1.0) } else { 1.0 };
+    let i = d.sheet.min(sheets.len() - 1);
+    let last = sheets.len() - 1;
+    let mut out = Vec::new();
+    let start = i.saturating_sub(1);
+    let end = (i + 1).min(last);
+    for sheet in sheets.get(start..=end).into_iter().flatten() {
+        let (sw, sh) = (sheet.size.0 as f32, sheet.size.1 as f32);
+        if !(sw.is_finite() && sh.is_finite()) || sw < 1.0 || sh < 1.0 {
+            continue;
+        }
+        let k = (PREVIEW_BOX.0 / sw).min(PREVIEW_BOX.1 / sh);
+        for pl in &sheet.placed {
+            let [a, b, _, _, _, _] = pl.matrix.0;
+            let placed = (a.hypot(b) as f32) * k * ppp;
+            if !placed.is_finite() || placed < 0.05 {
+                continue;
+            }
+            let scale = placed.min(64.0);
+            if let Some(slot) = out.iter_mut().find(|(page, _)| *page == pl.page) {
+                if scale > slot.1 {
+                    slot.1 = scale;
+                }
+            } else if out.len() < 48 {
+                out.push((pl.page, scale));
+            }
+        }
+    }
+    out
 }
 
 /// Properties… on CUPS: the driver's options for this print, grouped as the driver groups them.
@@ -567,15 +612,15 @@ pub(crate) fn body(
         ui.add_space(12.0);
         // Preview.
         ui.vertical(|ui| {
-            ui.set_width(320.0);
-            let (area, _) = ui.allocate_exact_size(vec2(320.0, 380.0), egui::Sense::hover());
+            ui.set_width(PREVIEW_W);
+            let (area, _) = ui.allocate_exact_size(vec2(PREVIEW_W, PREVIEW_H), egui::Sense::hover());
             ui.painter().rect_filled(area, 6.0, t.hover);
             match (&settings, sheets.get(d.sheet)) {
                 (Err(e), _) => {
                     ui.put(area.shrink(16.0), egui::Label::new(egui::RichText::new(e).color(t.text_muted)).wrap());
                 }
                 (Ok(_), Some(sheet)) => {
-                    let k = ((area.width() - 24.0) / sheet.size.0 as f32).min((area.height() - 24.0) / sheet.size.1 as f32);
+                    let k = (PREVIEW_BOX.0 / sheet.size.0 as f32).min(PREVIEW_BOX.1 / sheet.size.1 as f32);
                     let paper = Rect::from_center_size(area.center(), vec2(sheet.size.0 as f32 * k, sheet.size.1 as f32 * k));
                     ui.painter().rect_filled(paper, 0.0, Color32::WHITE);
                     ui.painter().rect_stroke(paper, 0.0, Stroke::new(1.0, t.border), egui::StrokeKind::Outside);
@@ -667,4 +712,25 @@ pub(crate) fn body(
         }
     });
     (go, cancel)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn print_preview_is_sharper_than_a_thumbnail_on_a_high_dpi_screen() {
+        let d = PrintDraft::default();
+        let sizes = vec![(612.0, 792.0); 3];
+        let labels = vec!["1".into(), "2".into(), "3".into()];
+        let rasters = preview_rasters(&d, &sizes, &labels, 2.0);
+        let scale = rasters.iter().find(|(page, _)| *page == 0).map(|(_, s)| *s).unwrap();
+        // A 132 pt thumbnail at 2× is about 0.43 px/pt. The preview pane needs roughly twice that.
+        assert!(scale > 0.7, "letter page in the preview at 2 px/pt: {scale}");
+        assert!(rasters.iter().any(|(page, _)| *page == 1), "the next sheet is ready");
+        let mut later = d.clone();
+        later.sheet = 2;
+        let rasters = preview_rasters(&later, &sizes, &labels, 2.0);
+        assert!(rasters.iter().any(|(page, _)| *page == 2));
+    }
 }
