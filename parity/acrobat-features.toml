@@ -5942,8 +5942,8 @@ milestone = "M9"
 status = "shipped"
 commands = ["sign.validate"]
 tools = ["sign_list"]
-evidence = ["crates/sign/tests/pdf.rs::validates_a_signature_made_by_openssl"]
-notes = "validated; new signatures use CAdES"
+evidence = ["crates/sign/tests/pdf.rs::validates_a_signature_made_by_openssl", "crates/sign/tests/pdf.rs::validates_signatures_written_with_ber_indefinite_lengths", "crates/sign/tests/ber.rs::deeply_nested_segmented_content_is_an_error_not_a_stack_overflow", "crates/sign/tests/ber.rs::indefinite_length_nesting_bombs_are_refused"]
+notes = "validated, including BER-encoded CMS (indefinite lengths and segmented strings, as DocuSign, Documenso, Adobe PPKMS and Windows write it; the BER is reported in the details); new signatures use CAdES. Not read: BER high tag numbers. Still missing: multiple SignerInfos, counter-signatures, CMS with the signer's cert referenced but absent"
 
 [[feature]]
 id = "sign.cades-pades-bb"
@@ -5966,8 +5966,8 @@ milestone = "M9"
 status = "shipped"
 commands = ["sign.digital"]
 tools = ["sign_document"]
-evidence = ["crates/sign/tests/crypto.rs::signatures_round_trip_for_every_key_type"]
-notes = "SHA-256, SHA-384 for P-384; SHA-1 refused for new signatures, validated in old ones"
+evidence = ["crates/sign/tests/crypto.rs::signatures_round_trip_for_every_key_type", "crates/sign/tests/crypto.rs::rsa_signatures_are_read_with_every_digestinfo_variant", "crates/sign/tests/crypto.rs::ecdsa_signatures_are_read_as_der_non_minimal_der_or_raw", "crates/sign/tests/crypto.rs::verifies_ecdsa_on_p521_and_the_brainpool_curves", "crates/sign/tests/crypto.rs::keys_of_unknown_algorithms_are_unsupported_not_wrong", "crates/sign/tests/crypto.rs::tolerated_encodings_are_noted_and_standard_ones_are_not", "crates/sign/tests/crypto.rs::weak_digests_say_so_in_words_that_are_pinned", "crates/sign/tests/crypto.rs::an_rsa_signature_value_not_below_the_modulus_is_refused", "crates/sign/tests/crypto.rs::hostile_rsa_signature_values_are_wrong_not_crashes", "crates/sign/tests/algorithms.rs::rsa_with_sha3_sha512_256_and_ripemd160", "crates/sign/tests/algorithms.rs::rsa_pss_with_its_declared_parameters", "crates/sign/tests/algorithms.rs::ed25519_signs_the_signed_attributes_themselves", "crates/sign/tests/algorithms.rs::ecdsa_on_brainpool_p512r1", "crates/sign/tests/algorithms.rs::brainpool_p512r1_keys_must_have_coordinates_reduced_modulo_p", "crates/sign/tests/algorithms.rs::only_weak_digests_leave_a_note_when_a_signature_validates", "crates/sign/tests/pdf.rs::validates_the_legacy_adbe_x509_rsa_sha1_format"]
+notes = "SHA-256, SHA-384 for P-384; SHA-1 refused for new signatures, validated in old ones. Validation also reads SHA-224, SHA-512/224, SHA-512/256, SHA3-224/256/384/512, RIPEMD-160, RSA PKCS#1 with or without the DigestInfo NULL (a bare digest without any DigestInfo is refused), RSA-PSS with its declared MGF1 hash and salt length, ECDSA as DER/non-minimal DER/raw r||s on P-256, P-384, P-521 and brainpoolP256r1/P384r1/P512r1 (the last hand-written on crypto-bigint, checked against OpenSSL), Ed25519 (RFC 8419), and the legacy adbe.x509.rsa_sha1 format. An RSA value not below the modulus is refused (RFC 8017 5.2.2). SHA-1 and RIPEMD-160 validate but the signature details say the algorithm is weak (wording pinned by tests); tolerated encodings are listed in the details. An algorithm PdfCraft cannot check gives Unknown, not Invalid. Still missing: Ed448/SHAKE, DSA, brainpool curves other than P256/P384/P512, signing with the new digests"
 
 [[feature]]
 id = "sign.certify"
@@ -6179,11 +6179,35 @@ title = "EU Trusted Lists"
 area = "H"
 tier = "P2"
 milestone = "M9"
-status = "planned"
+status = "partial"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["sign_trust"]
+evidence = ["crates/sign/src/trust.rs::a_list_reads_concatenated_der_and_rejects_garbage", "crates/sign/tests/chain.rs::trust_sets_are_off_by_default_and_a_loaded_list_is_named_when_it_vouches", "crates/automation/tests/automation.rs::trust_sets_are_off_until_switched_on_through_sign_trust"]
+notes = "Not built in and off by default: `cargo xtask trust-lists` writes the qualified CA services of the EU Trusted Lists (CC BY 4.0) to dist/trust/eutl-qualified-ca.der and the user loads that file (sign_trust eu_trusted_list), kept apart from their own certificates. Chains through such a list still need CA certificates all the way (basicConstraints, keyCertSign, path length, validity). Missing: a UI switch, withdrawn services at the signing time, XML signature checks of the lists, refreshing from the app. Adobe's AATL is not used (Adobe data without an open licence, AGENTS.md section 1.1)"
+
+[[feature]]
+id = "sign.builtin-roots"
+title = "Optional built-in roots of commercial CAs"
+area = "H"
+tier = "P2"
+milestone = "M9"
+status = "partial"
+commands = []
+tools = ["sign_trust"]
+evidence = ["crates/sign/src/trust.rs::the_builtin_roots_match_their_manifest", "crates/sign/tests/chain.rs::the_builtin_roots_only_anchor_when_switched_on", "crates/sign/tests/chain.rs::a_trust_set_does_not_vouch_for_a_certificate_that_is_not_meant_for_signing_documents", "crates/sign/tests/pdf.rs::a_trust_set_does_not_vouch_for_a_timestamp_authority_that_is_not_meant_for_time_stamps", "crates/automation/tests/automation.rs::trust_sets_are_off_until_switched_on_through_sign_trust"]
+notes = "22 roots (DigiCert, GlobalSign, Sectigo, Entrust, QuoVadis, Certum, WISeKey), each pinned by SHA-256 in builtin-roots.toml and compared with Mozilla's root sets or a signed PDF; embedded (23 KB) but trusted only when the user switches them on (sign_trust builtin_roots), pending the project owner's decision on built-in trust. A set only vouches for a signer meant for signing documents (key usage with digitalSignature or nonRepudiation, extended key usage with e-mail protection, Adobe document signing or any purpose, or neither extension) and for a time-stamp authority with the time-stamping purpose; the user's own certificates are never second-guessed. The WISeKey download URL is unconfirmed (the build sandbox could not reach it): run `cargo xtask trust-roots`. Missing: unknown critical extensions, name constraints and the chain's own extended key usage are not checked; a UI switch, IdenTrust, SwissSign, Buypass, Actalis"
+
+[[feature]]
+id = "sign.chain-constraints"
+title = "Certificate chains honour CA constraints"
+area = "H"
+tier = "P1"
+milestone = "M9"
+status = "shipped"
+commands = []
+tools = ["sign_list"]
+evidence = ["crates/sign/tests/chain.rs::an_end_entity_certificate_cannot_issue", "crates/sign/tests/chain.rs::a_path_length_constraint_limits_the_cas_below", "crates/sign/tests/chain.rs::issuers_must_have_been_valid_when_it_matters", "crates/sign/tests/chain.rs::a_signature_chaining_through_an_ordinary_certificate_is_not_trusted"]
+notes = "An issuer must be CA:TRUE (an old v1 self-signed root counts), have keyCertSign when it has a key usage, allow the CAs below it (pathLenConstraint) and, with a known signing or token time, have been valid then; the details say why one was refused. Not checked: name constraints, policies, EKU of CAs, revocation of intermediates from the chain itself"
 
 [[feature]]
 id = "sign.os-trust"
@@ -6218,8 +6242,8 @@ milestone = "M9"
 status = "shipped"
 commands = ["sign.panel"]
 tools = ["sign_list"]
-evidence = ["crates/sign/tests/pdf.rs::later_changes_are_classified_under_the_signature_permissions", "crates/sign/tests/pdf.rs::signing_an_existing_field_and_counter_signing", "crates/engine/src/tests.rs::signing_saving_trusting_and_commenting_afterwards"]
-notes = "revision diff classified as signing, form fill, comments, metadata, page content or structure"
+evidence = ["crates/sign/tests/pdf.rs::later_changes_are_classified_under_the_signature_permissions", "crates/sign/tests/pdf.rs::signing_an_existing_field_and_counter_signing", "crates/engine/src/tests.rs::signing_saving_trusting_and_commenting_afterwards", "crates/sign/tests/pdf.rs::validation_data_and_xmp_added_after_signing_are_not_tampering", "crates/sign/tests/pdf.rs::a_dss_entry_does_not_make_the_object_it_names_part_of_the_store", "crates/sign/tests/pdf.rs::an_existing_dictionary_is_not_a_store_part_because_the_store_names_it", "crates/sign/tests/pdf.rs::an_existing_array_stays_what_it_is_when_the_store_points_at_it", "crates/sign/tests/pdf.rs::a_signed_store_may_grow_but_not_lose_or_swap_entries", "crates/sign/tests/pdf.rs::a_dictionary_labelled_metadata_is_not_a_metadata_change", "crates/sign/tests/pdf.rs::a_stream_already_labelled_metadata_when_signed_is_not_metadata_unless_the_catalog_names_it", "crates/sign/tests/pdf.rs::the_catalogs_own_xmp_stream_may_still_be_rewritten_after_signing"]
+notes = "revision diff classified as signing, form fill, comments, metadata, page content or structure. Later revisions that add DSS data (new /Certs, /CRLs, /OCSPs, /VRI objects, or ones of the signed store that only grew) or rewrite the catalog's XMP are permitted changes; a /DSS entry that names other objects, or a /Type /DSS or /Type /Metadata label on an existing dictionary or stream, does not excuse changing them (negative tests at every DocMDP level)"
 
 [[feature]]
 id = "sign.view-signed-version"
