@@ -4,16 +4,18 @@
 //! fetched by `cargo xtask models`; see ATTRIBUTION.toml). The caller renders a page to pixels;
 //! [`Ocr::recognize`] finds text in them. The engine writes placed text as an invisible layer
 //! (rendering mode 3), making a searchable image without changing the original image.
-//! [`text_layer`] is the legacy WinAnsi writer; the engine supplies Unicode fonts for Chinese.
+//! [`text_layer`] is the legacy WinAnsi writer; the engine supplies Unicode fonts for text
+//! outside WinAnsi (Chinese, and Latin letters no standard font encodes).
 //!
-//! English uses ocrs; Chinese and English mixed text uses PP-OCRv4 on the same local runtime.
+//! English uses ocrs; Chinese (`zh`) and accented Latin (`la`) use PP-OCR models on the same
+//! local runtime, each with its own recognition model and character dictionary.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 use rten_imageproc::BoundingRect;
 use std::path::{Path, PathBuf};
 
-mod chinese;
+mod ppocr;
 
 pub use pdfcraft_fonts::helvetica_width;
 
@@ -22,9 +24,16 @@ pub const DETECTION_MODEL: &str = "text-detection.rten";
 pub const RECOGNITION_MODEL: &str = "text-recognition.rten";
 pub const CHINESE_MODEL: &str = "chinese-recognition.onnx";
 pub const CHINESE_DICTIONARY: &str = "chinese-keys.txt";
+pub const LATIN_MODEL: &str = "latin-recognition.onnx";
+pub const LATIN_DICTIONARY: &str = "latin-keys.txt";
+
+/// The PP-OCR languages: (code, model file, dictionary file, output classes = CTC blank +
+/// one per dictionary line + the appended space). The class count is pinned per model, so a
+/// wrong or truncated dictionary fails at load instead of decoding garbage.
+const PP_OCR: &[(&str, &str, &str, usize)] = &[("zh", CHINESE_MODEL, CHINESE_DICTIONARY, 6625), ("la", LATIN_MODEL, LATIN_DICTIONARY, 504)];
 
 /// The languages the models read (ISO 639-1).
-pub const LANGUAGES: &[(&str, &str)] = &[("en", "English"), ("zh", "Chinese (Simplified) and English")];
+pub const LANGUAGES: &[(&str, &str)] = &[("en", "English"), ("zh", "Chinese (Simplified) and English"), ("la", "Latin (accented)")];
 
 #[derive(Debug, thiserror::Error)]
 pub enum OcrError {
@@ -36,12 +45,12 @@ pub enum OcrError {
     Recognize(String),
     #[error("the image is empty")]
     EmptyImage,
-    #[error("unsupported OCR language {0:?}; choose en or zh")]
+    #[error("unsupported OCR language {0:?}; choose en, zh or la")]
     Language(String),
 }
 
-/// Where a language's detector and recogniser are. Chinese also requires a dictionary beside
-/// the recognition model.
+/// Where a language's detector and recogniser are. The PP-OCR languages also require their
+/// character dictionary beside the recognition model.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Models {
     pub detection: PathBuf,
@@ -55,10 +64,14 @@ impl Models {
     }
 
     pub fn in_dir_for(dir: &Path, language: &str) -> Option<Models> {
-        let recognition = match language {
-            "en" => RECOGNITION_MODEL,
-            "zh" if dir.join(CHINESE_DICTIONARY).is_file() => CHINESE_MODEL,
-            _ => return None,
+        let recognition = if language == "en" {
+            RECOGNITION_MODEL
+        } else {
+            let &(_, model, dictionary, _) = PP_OCR.iter().find(|(code, ..)| *code == language)?;
+            if !dir.join(dictionary).is_file() {
+                return None;
+            }
+            model
         };
         let m = Models { detection: dir.join(DETECTION_MODEL), recognition: dir.join(recognition) };
         (m.detection.is_file() && m.recognition.is_file()).then_some(m)
@@ -90,7 +103,7 @@ impl Models {
 }
 
 /// A recognised text segment and its box in image pixels `[left, top, right, bottom]`.
-/// English segments are words; Chinese segments are whole lines (no inserted spaces).
+/// English segments are words; Chinese and Latin segments are whole lines.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Word {
     pub text: String,
@@ -112,24 +125,25 @@ impl Line {
 /// A loaded recogniser. Loading takes a moment; keep one and reuse it.
 pub struct Ocr {
     engine: ocrs::OcrEngine,
-    chinese: Option<chinese::Chinese>,
+    ppocr: Option<ppocr::PpOcr>,
 }
 
 impl Ocr {
     pub fn load(models: &Models) -> Result<Ocr, OcrError> {
         let load = |p: &Path| rten::Model::load_file(p).map_err(|e| OcrError::Load(p.display().to_string(), e.to_string()));
-        let chinese = if models.recognition.file_name().is_some_and(|f| f == CHINESE_MODEL) {
-            Some(chinese::Chinese::load(&models.recognition, &models.recognition.with_file_name(CHINESE_DICTIONARY))?)
-        } else {
-            None
-        };
+        let name = models.recognition.file_name().and_then(|f| f.to_str()).unwrap_or_default();
+        let ppocr = PP_OCR
+            .iter()
+            .find(|(_, model, _, _)| *model == name)
+            .map(|(_, _, dictionary, classes)| ppocr::PpOcr::load(&models.recognition, &models.recognition.with_file_name(dictionary), *classes))
+            .transpose()?;
         let params = ocrs::OcrEngineParams {
             detection_model: Some(load(&models.detection)?),
-            recognition_model: if chinese.is_none() { Some(load(&models.recognition)?) } else { None },
+            recognition_model: if ppocr.is_none() { Some(load(&models.recognition)?) } else { None },
             ..Default::default()
         };
         let engine = ocrs::OcrEngine::new(params).map_err(|e| OcrError::Load("ocr engine".into(), e.to_string()))?;
-        Ok(Ocr { engine, chinese })
+        Ok(Ocr { engine, ppocr })
     }
 
     /// Load the models found by [`Models::find`].
@@ -160,7 +174,7 @@ impl Ocr {
         // ocrs wants 1 or 3 channels.
         let rgb: std::borrow::Cow<[u8]> = if channels == 4 {
             pixels.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect::<Vec<u8>>().into()
-        } else if channels == 1 && self.chinese.is_some() {
+        } else if channels == 1 && self.ppocr.is_some() {
             pixels.iter().flat_map(|p| [*p; 3]).collect::<Vec<_>>().into()
         } else {
             pixels.into()
@@ -170,7 +184,7 @@ impl Ocr {
         let input = self.engine.prepare_input(source).map_err(|e| err(&e))?;
         let found = self.engine.detect_words(&input).map_err(|e| err(&e))?;
         let lines = self.engine.find_text_lines(&input, &found);
-        if let Some(chinese) = &self.chinese {
+        if let Some(ppocr) = &self.ppocr {
             if lines.len() > 4096 {
                 return Err(OcrError::Recognize("page has more than 4096 text lines".into()));
             }
@@ -182,7 +196,7 @@ impl Ocr {
                     .fold(None, |rect: Option<rten_imageproc::Rect<f32>>, r| Some(rect.map_or(r, |b| b.union(r))));
                 let Some(r) = rect else { continue };
                 let rect = [r.left(), r.top(), r.right(), r.bottom()];
-                let text = chinese.recognize(&rgb, width, height, rect)?;
+                let text = ppocr.recognize(&rgb, width, height, rect)?;
                 if !text.is_empty() {
                     result.push(Line { words: vec![Word { text, rect }] });
                 }

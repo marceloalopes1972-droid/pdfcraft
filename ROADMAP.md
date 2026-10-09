@@ -64,7 +64,7 @@ Read this before choosing work. The feature table above counts what exists; this
 | J Create | 32% | From images, text, clipboard; Word/HTML/RTF export. Missing: Office import, Excel/PowerPoint export |
 | N Misc | 27% | CLI, MCP, UI control channel, Action Wizard. Missing: AI providers, performance budgets |
 | K Optimize | 26% | Reduce File Size, Optimizer. Missing: preflight, PDF/X/UA, transparency/fonts panels |
-| I OCR | 19% | Searchable image for English and Chinese/English mixed text. Missing: other languages, editable-text output, deskew |
+| I OCR | 19% | Searchable image for English, Chinese/English mixed text and accented Latin (German, French, Czech, Polish, Nordic). Missing: other languages, editable-text output, deskew |
 
 **What "shipped" means, and doesn't.** A feature is shipped when it exists and at least one specific test covers it. 159 of 398 shipped features rest on exactly one test, and only about 5 cite an external oracle (`pdftotext`, `pdfsig`, OpenSSL, a corpus). Shipped does not mean "as good as Acrobat".
 
@@ -138,6 +138,8 @@ M0 → M1 → M2 → M3 → M4 must happen in order. After M4, M5–M12 can run 
 - **2026-10-08 (M9, #179):** Windows Current User Personal certificate store identities join file-based digital IDs, signing through CNG without exporting keys. RSA-2048 and ECDSA P-256 round trips use temporary certificates with cleanup guards; enumeration, missing identities, automation errors and the password-free UI have regression coverage. Smart cards and PKCS #11 remain planned; overall effort estimate unchanged.
 
 Newest first. One line per session: the date, what moved, and the new overall percentage.
+
+- **2026-10-09 (community, M10, #524, accented Latin OCR):** Scan & OCR gets a **Latin (accented)** document language (`la`) beside English and Chinese: German, French, Spanish, Portuguese, Czech, Polish, Nordic and other European scans keep their accented letters instead of coming out as `?`. It runs the Apache-2.0 PP-OCRv5 Latin mobile model (ONNX via RapidAI, fetched by `cargo xtask models`, SHA-pinned with its PaddleOCR dictionary in ATTRIBUTION.toml) on the same RTen runtime and ocrs detector as Chinese; `ocr_status`, the dialog dropdown, `ocr_recognize`/`ocr_recognize_files` and the Unicode searchable-text layer follow the per-language wiring of #433. A German round-trip test renders umlauts and ß with the committed Inter face and checks them through recognition, search, save/reopen, unchanged pixels and undo. Overall estimate unchanged (about 30–35%).
 
 - **2026-10-09 (M14, German interface follow-up):** Follow the merged German catalog with shorter search/action labels, corrected callout/accessibility wording and a distinct certificate Subject context. Localized tool names retain their capitalization and comment composer titles go through the catalog. Search hints reserve shortcut space and Home cards bound text with full hover text; layout, context and German Preferences/search control regression tests cover these changes. Overall effort estimate remains about 30–35%.
 
