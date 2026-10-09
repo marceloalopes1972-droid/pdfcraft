@@ -12,15 +12,15 @@ Detailed task lists and acceptance tests are in `plan/execution-plan.md` (local-
 
 The unit is **wall-clock hours of agent work** (Claude Opus 5.5 coding continuously; human review time not included).
 
-**Where we are (2026-10-07, measured by `cargo xtask parity` over 806 tracked Acrobat Pro features; 23 more are Adobe-cloud-only and out of scope):**
+**Where we are (2026-10-10, measured by `cargo xtask parity` over 807 tracked Acrobat Pro features; 23 more are Adobe-cloud-only and out of scope):**
 
 | Tier | Features | Shipped | Partial | Shipped % | Weighted % (partial = ½) |
 |---|---|---|---|---|---|
-| P0 (must-have for 1.0) | 251 | 222 | 25 | 88.4% | 93.4% |
-| P1 | 326 | 174 | 38 | 53.4% | 59.2% |
-| P2 | 186 | 14 | 7 | 7.5% | 9.4% |
+| P0 (must-have for 1.0) | 251 | 225 | 23 | 89.6% | 94.2% |
+| P1 | 326 | 176 | 41 | 54.0% | 60.3% |
+| P2 | 187 | 18 | 9 | 9.6% | 12.0% |
 | P3 | 43 | 1 | 0 | 2.3% | 2.3% |
-| **All** | **806** | **411** | **70** | **51.0%** | **55.3%** |
+| **All** | **807** | **420** | **73** | **52.0%** | **56.6%** |
 
 **Effort-weighted parity: ≈ 30–35%.** Feature counts overstate progress: the remaining features include the hardest ones (our own renderer and font engine, editing existing text and reflow, OCR beyond Latin, XFA, PDF/A/X/UA preflight, Office export, long-term signature validation). Weighting each milestone by its estimated size gives about a third of the total work done. See **[Honest assessment](#honest-assessment-2026-10-05)** for what the numbers don't show.
 
@@ -167,6 +167,8 @@ M0 → M1 → M2 → M3 → M4 must happen in order. After M4, M5–M12 can run 
 - **2026-10-08 (M9, #179):** Windows Current User Personal certificate store identities join file-based digital IDs, signing through CNG without exporting keys. RSA-2048 and ECDSA P-256 round trips use temporary certificates with cleanup guards; enumeration, missing identities, automation errors and the password-free UI have regression coverage. Smart cards and PKCS #11 remain planned; overall effort estimate unchanged.
 
 Newest first. One line per session: the date, what moved, and the new overall percentage.
+
+- **2026-10-10 (PR #151):** M6 merge-conflict repair against current main: printed-checkbox hover/click and regression tests retained alongside the PdfCraft rename, localized form notices, rejected-draft preservation, and freehand-hover fixes. Fmt, workspace clippy/tests, wasm, assets, parity and layering pass; synthetic CLI rendering and desktop control-channel hover/check/clear verified. No feature status changes in this repair; refreshed the measured table for current main: 807 tracked features, 52.0% shipped (56.6% weighted), ≈ 30–35% of effort.
 
 - **2026-10-09 (M14, German interface follow-up):** Follow the merged German catalog with shorter search/action labels, corrected callout/accessibility wording and a distinct certificate Subject context. Localized tool names retain their capitalization and comment composer titles go through the catalog. Search hints reserve shortcut space and Home cards bound text with full hover text; layout, context and German Preferences/search control regression tests cover these changes. Overall effort estimate remains about 30–35%.
 
