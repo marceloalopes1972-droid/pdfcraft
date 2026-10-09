@@ -1457,6 +1457,21 @@ trailer << /Root 1 0 R >>
         assert_eq!(pretty_date("D:20260930104512-04'00'"), "2026-09-30 10:45");
         assert_eq!(pretty_date("yesterday"), "yesterday");
     }
+
+    #[test]
+    fn jspdf_high_precision_mediabox_does_not_overflow_dimensions() {
+        let pdf = b"%PDF-1.3
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 3874.9606299212600788 5493.5433070866147318] >> endobj
+trailer << /Root 1 0 R >>
+%%EOF";
+        let info = inspect(std::sync::Arc::new(pdf.to_vec()), None).expect("opens");
+        assert_eq!(info.pages.len(), 1);
+        let p = &info.pages[0];
+        assert!((p.width - 3874.96).abs() < 0.1, "width expected ~3874.96, got {}", p.width);
+        assert!((p.height - 5493.54).abs() < 0.1, "height expected ~5493.54, got {}", p.height);
+    }
 }
 
 /// "1.7" from the parser's version name ("Pdf17", "V1_7", …).
