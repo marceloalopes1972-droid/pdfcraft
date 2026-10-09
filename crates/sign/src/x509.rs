@@ -5,6 +5,13 @@ use crate::SignError;
 use crate::der::{self, Time, Tlv, tag};
 use crate::keys::{self, DigestAlg, PrivateKey, PublicKey};
 
+/// Extended key usage purposes (RFC 5280 §4.2.1.12, RFC 3161 §2.3).
+const EKU_ANY: &str = "2.5.29.37.0";
+const EKU_EMAIL_PROTECTION: &str = "1.3.6.1.5.5.7.3.4";
+const EKU_TIME_STAMPING: &str = "1.3.6.1.5.5.7.3.8";
+/// Adobe's document signing purpose, which Acrobat's own IDs carry.
+const EKU_ADOBE_DOCUMENT_SIGNING: &str = "1.2.840.113583.1.1.5";
+
 const CN: &str = "2.5.4.3";
 const C: &str = "2.5.4.6";
 const O: &str = "2.5.4.10";
@@ -323,6 +330,27 @@ impl Certificate {
         /// keyUsage bit 5.
         const KEY_CERT_SIGN: u16 = 1 << 5;
         (self.is_ca || (!self.has_basic_constraints && self.is_self_signed())) && self.key_usage.is_none_or(|u| u & KEY_CERT_SIGN != 0)
+    }
+
+    /// Whether the certificate is meant for signing documents: if it has a key usage, that
+    /// includes digitalSignature or nonRepudiation, and if it has an extended key usage, that
+    /// names e-mail protection, Adobe's document signing or any purpose. A certificate with
+    /// neither extension is unrestricted (RFC 5280 §4.2.1.12), as most personal ones are.
+    pub fn may_sign_documents(&self) -> bool {
+        /// keyUsage bits 0 and 1.
+        const DIGITAL_SIGNATURE_OR_NON_REPUDIATION: u16 = 0b11;
+        self.key_usage.is_none_or(|u| u & DIGITAL_SIGNATURE_OR_NON_REPUDIATION != 0)
+            && self
+                .extended_key_usage
+                .as_ref()
+                .is_none_or(|purposes| purposes.iter().any(|p| matches!(p.as_str(), EKU_EMAIL_PROTECTION | EKU_ADOBE_DOCUMENT_SIGNING | EKU_ANY)))
+    }
+
+    /// Whether the certificate is meant for signing time-stamp tokens. Unlike a signer, a
+    /// time-stamp authority has to say so: its extended key usage contains id-kp-timeStamping
+    /// (RFC 3161 §2.3), and "any purpose" is not enough.
+    pub fn may_timestamp(&self) -> bool {
+        self.extended_key_usage.as_ref().is_some_and(|purposes| purposes.iter().any(|p| p == EKU_TIME_STAMPING))
     }
 
     /// Valid at `t`.

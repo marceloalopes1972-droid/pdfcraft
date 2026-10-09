@@ -75,7 +75,13 @@ ECDSA P-256/P-384; the store integration is tested with software-backed keys.
   `data/builtin-roots.toml`; `cargo xtask trust-roots` rebuilds them and fails on any difference),
   and trust lists loaded from a file at run time (`TrustStore::lists`; `cargo xtask trust-lists`
   writes the EU Trusted Lists' qualified CAs to `dist/trust/`, nothing of the kind is embedded).
-  The details name the set that vouched. Adobe's AATL is not used: it is Adobe data without an
+  The details name the set that vouched. The sets trust a CA for everything it issues, and most of
+  those CAs issue TLS certificates, so a set only vouches for a signer meant for signing documents
+  (a key usage with digitalSignature or nonRepudiation, an extended key usage with e-mail
+  protection, Adobe's document signing or any purpose, or neither extension) and for a
+  time-stamp authority that says so (id-kp-timeStamping, RFC 3161 §2.3). Certificates the user
+  trusts themselves are never second-guessed. Not checked yet: unknown critical extensions, name
+  constraints, and the extended key usage of the CAs in the chain. Adobe's AATL is not used: it is Adobe data without an
   open licence (AGENTS.md §1.1), so signers that chain only to an AATL root stay "unknown" until
   the user trusts that root.
 - **Validation algorithms:** digests SHA-1, SHA-224/256/384/512, SHA-512/224, SHA-512/256,
