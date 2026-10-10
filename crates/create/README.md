@@ -11,6 +11,7 @@ Layer L4. Create a PDF (Acrobat's Create a PDF tool), execution plan M10.2:
   resolution (1–1200 dpi), without resampling or recompressing image pixels. Use 72 dpi
   for one point per pixel, or `ImageResolution::Embedded` for the same behavior as
   `from_images`. The largest page side is still capped at 14,400 points;
-- `from_text(text, …)`: plain text set in Helvetica, wrapped and paginated.
+- `from_text(text, …)`: plain text set in Helvetica, wrapped and paginated;
+- `from_slides(title, subtitle, &[Slide])`: a 16:9 presentation, a title slide then one page per slide (title, accent rule, bullets); bullets shrink to 12 pt before continuing on a slide marked "(cont.)", so nothing is dropped.
 
 Every function returns a `pdfcraft_cos::Document`; the caller writes it.

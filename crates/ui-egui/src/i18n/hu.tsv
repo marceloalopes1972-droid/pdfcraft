@@ -2111,3 +2111,51 @@ action wizard	Start	Indítás
 	This printer offers no settings of its own.	Ennek a nyomtatónak nincsenek saját beállításai.
 	Scroll tabs left	Lapok görgetése balra
 	Scroll tabs right	Lapok görgetése jobbra
+
+# AI assistant
+	Ask	Kérdés
+	Presentation	Bemutató
+	Focus or audience (optional)	Fókusz vagy közönség (nem kötelező)
+	Your question	Az Ön kérdése
+	Translate into (language)	Fordítás erre (nyelv)
+	What should be changed?	Mit kell módosítani?
+	Which tables (optional)	Mely táblázatok (nem kötelező)
+	Enter your {provider} API key.	Adja meg a(z) {provider} API-kulcsát.
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	Az MI-asszisztenshez az asztali alkalmazás kell: a webes változat nem éri el az MI-szolgáltatókat.
+	Open a document first.	Először nyisson meg egy dokumentumot.
+	Pages: {e}	Oldalak: {e}
+	Fill in “{field}”.	Töltse ki ezt: „{field}”.
+	Stopped.	Leállítva.
+	The assistant stopped unexpectedly.	Az asszisztens váratlanul leállt.
+	Provider	Szolgáltató
+	API key	API-kulcs
+	Using {var} from the environment.	A környezet {var} változója van használatban.
+	Remember API keys on this computer	API-kulcsok megjegyzése ezen a számítógépen
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	A kulcsok titkosítás nélkül kerülnek a PdfCraft beállításfájljába. Közös számítógépen hagyja kikapcsolva.
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	Másik, ugyanezt az API-t használó HTTPS-cím, vagy http://localhost egy ezen a gépen futó modellhez.
+	all	mind
+	Answer language	Válasz nyelve
+	automatic	automatikus
+	Slides	Diák
+	auto	auto
+	Working…	Folyamatban…
+	Open as PDF	Megnyitás PDF-ként
+	No tables found.	Nem található táblázat.
+	{name} (page {page}): {rows} rows	{name} ({page}. oldal): {rows} sor
+	{name}: {rows} rows	{name}: {rows} sor
+	Save as Excel…	Mentés Excel-fájlként…
+	Save as PowerPoint…	Mentés PowerPoint-fájlként…
+	{n} tool calls.	{n} eszközhívás.
+	Stopped at the step limit before the model finished.	A lépéskorlátnál leállt, mielőtt a modell befejezte volna.
+	{requests} requests · {input} input and {output} output tokens	{requests} kérés · {input} bemeneti és {output} kimeneti token
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	Az utasítás és a dokumentum azon részei, amelyeket a modell az eszközeivel elolvas, a(z) {provider} szolgáltatóhoz kerülnek. A módosítások a megnyitott dokumentumba kerülnek: a Szerkesztés ▸ Visszavonás paranccsal vonhatók vissza; semmi sem mentődik, amíg Ön nem ment.
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	A kiválasztott oldalak szövege a(z) {provider} szolgáltatóhoz kerül. Semmi sem kerül elküldésre, amíg meg nem nyomja a Futtatás gombot.
+	Stop	Leállítás
+	The AI assistant has finished	Az MI-asszisztens végzett
+	Saved {path}	Mentve: {path}
+	Created a PDF from the assistant's answer	PDF készült az asszisztens válaszából
+	Couldn't create the PDF: {e}	Nem sikerült létrehozni a PDF-et: {e}
+	Bring your own API key (off by default)	Saját API-kulcs (alapból kikapcsolva)
+	Edit with an instruction	Szerkesztés utasítással
+	Extract tables to Excel	Táblázatok kinyerése Excelbe
+	Create a presentation	Bemutató készítése

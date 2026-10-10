@@ -81,3 +81,62 @@
 	Slash	Barra
 	Scroll tabs left	Rolar as abas para a esquerda
 	Scroll tabs right	Rolar as abas para a direita
+
+# AI assistant
+	Summarize	Resumir
+	Ask	Perguntar
+	Translate	Traduzir
+	Tables	Tabelas
+	Presentation	Apresentação
+	Focus or audience (optional)	Foco ou público (opcional)
+	Your question	Sua pergunta
+	Translate into (language)	Traduzir para (idioma)
+	What should be changed?	O que deve ser alterado?
+	Which tables (optional)	Quais tabelas (opcional)
+	Enter your {provider} API key.	Informe sua chave de API da {provider}.
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	O assistente de IA precisa do aplicativo para desktop: a versão web não consegue acessar os provedores de IA.
+	Open a document first.	Abra um documento primeiro.
+	Pages: {e}	Páginas: {e}
+	Fill in “{field}”.	Preencha “{field}”.
+	Stopped.	Interrompido.
+	The assistant stopped unexpectedly.	O assistente parou inesperadamente.
+	Provider	Provedor
+	API key	Chave de API
+	Using {var} from the environment.	Usando {var} do ambiente.
+	Model	Modelo
+	Remember API keys on this computer	Lembrar as chaves de API neste computador
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	Elas ficam sem criptografia no arquivo de configurações do PdfCraft. Deixe desmarcado em computador compartilhado.
+	Advanced	Avançado
+	Endpoint	Endereço da API
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	Outro endereço HTTPS que use a mesma API, ou http://localhost para um modelo neste computador.
+	all	todas
+	Answer language	Idioma da resposta
+	automatic	automático
+	Slides	Slides
+	auto	auto
+	Working…	Trabalhando…
+	Copy	Copiar
+	Open as PDF	Abrir como PDF
+	No tables found.	Nenhuma tabela encontrada.
+	{name} (page {page}): {rows} rows	{name} (página {page}): {rows} linhas
+	{name}: {rows} rows	{name}: {rows} linhas
+	Save as Excel…	Salvar como Excel…
+	Save as PowerPoint…	Salvar como PowerPoint…
+	{n} tool calls.	{n} chamadas de ferramenta.
+	Stopped at the step limit before the model finished.	Parou no limite de etapas antes de o modelo terminar.
+	{requests} requests · {input} input and {output} output tokens	{requests} solicitações · {input} tokens de entrada e {output} de saída
+	AI assistant	Assistente de IA
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	Sua instrução e as partes do documento que o modelo lê com suas ferramentas são enviadas à {provider}. As alterações vão para o documento aberto: desfaça-as com Editar ▸ Desfazer; nada é salvo até você salvar.
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	O texto das páginas escolhidas é enviado à {provider}. Nada é enviado até você clicar em Executar.
+	Stop	Parar
+	Run	Executar
+	Close	Fechar
+	The AI assistant has finished	O assistente de IA terminou
+	Saved {path}	Salvo em {path}
+	Created a PDF from the assistant's answer	PDF criado a partir da resposta do assistente
+	Couldn't create the PDF: {e}	Não foi possível criar o PDF: {e}
+	Bring your own API key (off by default)	Use sua própria chave de API (desligado por padrão)
+	Edit with an instruction	Editar com uma instrução
+	Extract tables to Excel	Extrair tabelas para o Excel
+	Create a presentation	Criar uma apresentação
+	Ask about this document	Perguntar sobre este documento

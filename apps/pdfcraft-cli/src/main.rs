@@ -24,6 +24,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use pdfcraft_engine::export::ImageFormat;
+
+mod ai;
 use pdfcraft_render::{PageRenderer, RenderConfig, RenderRequest, RequestKind, inspect};
 
 /// The `mcp` lines of [`USAGE`]: only a build with the `mcp` feature has the command.
@@ -63,6 +65,7 @@ pdfcraft-cli run    --script steps.json [--root DIR]      [{\"tool\": \"doc_open
     "\
 pdfcraft-cli ui     --control FILE <method> [key=value …] [--out shot.png]
                                                            drive a running app started with --control FILE
+pdfcraft-cli ai     <providers|summarize|ask|edit|tables|slides> …   AI assistant with your own API key (opt-in; ai --help)
 help and feedback: https://discord.gg/artcraft"
 );
 
@@ -88,6 +91,8 @@ fn main() -> ExitCode {
         Some("tools") => tools(),
         Some("run") => run(&args[1..]),
         Some("ui") => ui(&args[1..]),
+        Some("ai") if matches!(args.get(1).map(String::as_str), None | Some("--help" | "-h")) => stdout_line(format_args!("{}", ai::USAGE)),
+        Some("ai") => ai::run(&args[1..]),
         #[cfg(feature = "mcp")]
         Some("mcp") => mcp(&args[1..]),
         #[cfg(not(feature = "mcp"))]

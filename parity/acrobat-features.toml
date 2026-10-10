@@ -9407,11 +9407,11 @@ title = "AI provider interface (local model or own endpoint), off by default"
 area = "N"
 tier = "P2"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/tests.rs::providers_parse_by_id_and_common_name", "crates/ai/src/tests.rs::settings_that_cannot_work_or_would_leak_the_key_are_refused", "crates/ai/src/tests.rs::anthropic_requests_use_the_messages_api_with_fallbacks", "crates/ai/src/tests.rs::openai_compatible_requests_share_one_format"]
+notes = "pdfcraft-ai: the user's own API key for Anthropic, OpenAI, DeepSeek, xAI Grok or Google Gemini (two wire formats; OpenAI-compatible endpoints and local servers via base URL). Off unless the user runs `pdfcraft-cli ai`. Missing: a settings panel and assistant pane in the desktop app, keychain storage of the key, streaming."
 
 [[feature]]
 id = "misc.ai-summary"
@@ -9419,11 +9419,11 @@ title = "Summarize a document"
 area = "N"
 tier = "P2"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/tests.rs::summaries_and_answers_send_the_document_as_data"]
+notes = "`pdfcraft-cli ai summarize` (stdout, .txt/.md, or a new PDF), page citations, optional focus and language. Missing: the desktop UI; documents over the model's context are refused (choose --pages) rather than chunked."
 
 [[feature]]
 id = "misc.ai-ask"
@@ -9431,11 +9431,11 @@ title = "Ask questions with citations to pages"
 area = "N"
 tier = "P2"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/tests.rs::summaries_and_answers_send_the_document_as_data"]
+notes = "`pdfcraft-cli ai ask` answers from the document text with (p. N) citations. Missing: the desktop UI, follow-up questions, clickable citations."
 
 [[feature]]
 id = "misc.ai-conversational-edit"
@@ -9443,11 +9443,11 @@ title = "Natural-language editing through registry commands"
 area = "N"
 tier = "P3"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/tests.rs::the_tool_loop_runs_calls_and_returns_results_to_the_model", "crates/ai/src/tests.rs::commands_run_through_the_workspace_and_errors_reach_the_model", "crates/automation/tests/automation.rs::assistant_tools_leave_out_files_printing_signing_and_command_runners"]
+notes = "`pdfcraft-cli ai edit` lets the model use the automation tools (about 100; file, print, sign and command-runner tools withheld) on a private copy confined to a temporary folder; the result is saved as a new file. Missing: the desktop UI with preview and approve/undo per step."
 
 [[feature]]
 id = "misc.ai-presentation"
@@ -9455,11 +9455,11 @@ title = "Generate a presentation from documents"
 area = "N"
 tier = "P3"
 milestone = "M13"
-status = "planned"
+status = "partial"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ai/src/tests.rs::slides_are_outlined_from_the_document", "crates/export/src/office.rs::presentation_has_a_title_slide_and_one_slide_each", "crates/create/src/tests.rs::slides_become_a_title_page_and_one_page_per_slide"]
+notes = "`pdfcraft-cli ai slides`: an outline from the document as PowerPoint (.pptx, 16:9, title slide plus bullet slides) or PDF slides. Missing: the desktop UI, images and charts on slides, speaker notes, themes."
 
 [[feature]]
 id = "misc.ai-podcast"

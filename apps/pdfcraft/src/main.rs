@@ -25,6 +25,7 @@ use std::rc::Rc;
 
 use pdfcraft_ui_egui::PdfCraftApp;
 
+mod ai;
 #[cfg(target_os = "macos")]
 mod apple_events;
 mod logging;
@@ -281,6 +282,8 @@ fn app_creator<'a>(
         }
         app.integrated_titlebar = integrated;
         app.update_source = Some(std::sync::Arc::new(updates::latest_release));
+        // Used only when the user runs an AI task with their own key.
+        app.ai_transport = Some(std::sync::Arc::new(ai::LazyHttps::default()));
         app.os_key_store_ids = cfg!(any(target_os = "macos", target_os = "windows"));
         #[cfg(target_os = "macos")]
         {

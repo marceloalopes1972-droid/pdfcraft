@@ -2136,3 +2136,51 @@ calendar date	December	грудня
 certificate	Subject	Власник сертифіката
 	Scroll tabs left	Прокрутити вкладки ліворуч
 	Scroll tabs right	Прокрутити вкладки праворуч
+
+# AI assistant
+	Ask	Запитати
+	Presentation	Презентація
+	Focus or audience (optional)	Акцент або аудиторія (необов’язково)
+	Your question	Ваше запитання
+	Translate into (language)	Перекласти на (мова)
+	What should be changed?	Що потрібно змінити?
+	Which tables (optional)	Які таблиці (необов’язково)
+	Enter your {provider} API key.	Введіть ваш API-ключ {provider}.
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	Для ШІ-помічника потрібен застосунок для комп’ютера: веб-версія не може звертатися до постачальників ШІ.
+	Open a document first.	Спочатку відкрийте документ.
+	Pages: {e}	Сторінки: {e}
+	Fill in “{field}”.	Заповніть поле «{field}».
+	Stopped.	Зупинено.
+	The assistant stopped unexpectedly.	Помічник несподівано зупинився.
+	Provider	Постачальник
+	API key	API-ключ
+	Using {var} from the environment.	Використовується {var} із середовища.
+	Remember API keys on this computer	Запам’ятати API-ключі на цьому комп’ютері
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	Вони зберігаються без шифрування у файлі налаштувань PdfCraft. На спільному комп’ютері не вмикайте цей параметр.
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	Інша HTTPS-адреса з тим самим API або http://localhost для моделі на цьому комп’ютері.
+	all	усі
+	Answer language	Мова відповіді
+	automatic	автоматично
+	Slides	Слайди
+	auto	авто
+	Working…	Виконується…
+	Open as PDF	Відкрити як PDF
+	No tables found.	Таблиць не знайдено.
+	{name} (page {page}): {rows} rows	{name} (стор. {page}): рядків: {rows}
+	{name}: {rows} rows	{name}: рядків: {rows}
+	Save as Excel…	Зберегти як Excel…
+	Save as PowerPoint…	Зберегти як PowerPoint…
+	{n} tool calls.	Викликів інструментів: {n}.
+	Stopped at the step limit before the model finished.	Зупинено на межі кроків до завершення роботи моделі.
+	{requests} requests · {input} input and {output} output tokens	Запитів: {requests} · токенів: {input} на вході, {output} на виході
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	Ваша інструкція та частини документа, які модель читає своїми інструментами, надсилаються до {provider}. Зміни вносяться у відкритий документ: скасувати їх можна через «Редагування ▸ Скасувати»; нічого не зберігається, доки ви не збережете.
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	Текст вибраних сторінок надсилається до {provider}. Нічого не надсилається, доки ви не натиснете «Виконати».
+	Stop	Зупинити
+	The AI assistant has finished	ШІ-помічник завершив роботу
+	Saved {path}	Збережено: {path}
+	Created a PDF from the assistant's answer	Створено PDF із відповіді помічника
+	Couldn't create the PDF: {e}	Не вдалося створити PDF: {e}
+	Bring your own API key (off by default)	Власний API-ключ (типово вимкнено)
+	Edit with an instruction	Редагувати за інструкцією
+	Extract tables to Excel	Видобути таблиці в Excel
+	Create a presentation	Створити презентацію

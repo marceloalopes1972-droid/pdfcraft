@@ -6,7 +6,7 @@ use pdfcraft_cos::{Dict, Document, ObjRef, Object, PdfString, Stream};
 
 mod extract;
 pub use extract::{ExtractedImage, ImageExport, extract_images, image_file};
-use pdfcraft_fonts::{literal, win_ansi, wrap};
+use pdfcraft_fonts::{literal, win_ansi, wrap, wrap_with};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum CreateError {
@@ -557,6 +557,152 @@ pub fn from_text(title: &str, text: &str, page: (f64, f64), font_size: f64) -> R
         let mut res = Dict::new();
         res.set(b"Font".to_vec(), Object::Dict(fonts));
         add_page(&mut doc, w, h, res, Some(c))?;
+    }
+    set_title(&mut doc, title);
+    Ok(doc)
+}
+
+// ── slides ──────────────────────────────────────────────────────────────────────────────────
+
+/// One slide of [`from_slides`]: a title and its bullet points.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Slide {
+    pub title: String,
+    pub bullets: Vec<String>,
+}
+
+/// Widescreen (16:9) slide size in points.
+pub const SLIDE: (f64, f64) = (960.0, 540.0);
+
+/// The most slides [`from_slides`] lays out; more is refused rather than truncated.
+pub const MAX_SLIDES: usize = 500;
+
+/// Approximate Helvetica-Bold advance: the regular metrics are about 8% narrower.
+fn bold_width(s: &str, size: f64) -> f64 {
+    pdfcraft_fonts::helvetica_width(s, size) * 1.08
+}
+
+fn text_line(c: &mut Vec<u8>, font: &str, size: f64, x: f64, y: f64, text: &str) {
+    c.extend(format!("BT /{font} {size:.1} Tf {x:.2} {y:.2} Td ").into_bytes());
+    c.extend(literal(&win_ansi(text)));
+    c.extend_from_slice(b" Tj ET\n");
+}
+
+/// A presentation as PDF: a title slide (`title`, `subtitle`), then one 16:9 page per slide
+/// with its title, an accent rule and its bullets, wrapped to the slide. Bullets that don't fit
+/// at 20 pt are set smaller (down to 12 pt); what still doesn't fit continues on a slide of
+/// the same title marked "(cont.)", so no text is dropped.
+pub fn from_slides(title: &str, subtitle: &str, slides: &[Slide]) -> Result<Document, CreateError> {
+    if slides.len() > MAX_SLIDES {
+        return Err(CreateError::Invalid(format!("{} slides; at most {MAX_SLIDES} are supported", slides.len())));
+    }
+    let (w, h) = SLIDE;
+    let margin = 56.0;
+    let text_w = w - 2.0 * margin;
+    let mut doc = Document::new_empty();
+    let font = |doc: &mut Document, base: &str| {
+        let mut f = Dict::new();
+        f.set(b"Type".to_vec(), Object::name("Font"));
+        f.set(b"Subtype".to_vec(), Object::name("Type1"));
+        f.set(b"BaseFont".to_vec(), Object::name(base));
+        f.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
+        doc.add(f)
+    };
+    let regular = font(&mut doc, "Helvetica");
+    let bold = font(&mut doc, "Helvetica-Bold");
+    let resources = || {
+        let mut fonts = Dict::new();
+        fonts.set(b"F1".to_vec(), Object::Ref(regular));
+        fonts.set(b"F2".to_vec(), Object::Ref(bold));
+        let mut res = Dict::new();
+        res.set(b"Font".to_vec(), Object::Dict(fonts));
+        res
+    };
+    // Accent colour: a dark teal band and rule.
+    let accent = "0.04 0.46 0.39";
+
+    // Title slide.
+    let mut c = format!("q {accent} rg 0 0 {w} 12 re f Q\n").into_bytes();
+    let title_size = 40.0;
+    let title_lines = wrap_with(title.trim(), title_size, text_w, bold_width);
+    let sub_lines = wrap(subtitle.trim(), 22.0, text_w);
+    let block = title_lines.len() as f64 * title_size * 1.2 + sub_lines.len() as f64 * 22.0 * 1.3 + 16.0;
+    let mut y = (h + block) / 2.0 - title_size;
+    for l in &title_lines {
+        let x = ((w - bold_width(l, title_size)) / 2.0).max(margin);
+        text_line(&mut c, "F2", title_size, x, y, l);
+        y -= title_size * 1.2;
+    }
+    y -= 16.0;
+    c.extend(b"q 0.35 0.35 0.35 rg\n");
+    for l in &sub_lines {
+        let x = ((w - pdfcraft_fonts::helvetica_width(l, 22.0)) / 2.0).max(margin);
+        text_line(&mut c, "F1", 22.0, x, y, l);
+        y -= 22.0 * 1.3;
+    }
+    c.extend(b"Q\n");
+    add_page(&mut doc, w, h, resources(), Some(c))?;
+
+    let mut number = 1usize;
+    for slide in slides {
+        let heading_size = 30.0;
+        let heading = wrap_with(slide.title.trim(), heading_size, text_w, bold_width);
+        let heading_h = heading.len().max(1) as f64 * heading_size * 1.15;
+        let top = h - margin - heading_size;
+        let body_top = top - heading_h - 28.0;
+        let body_h = (body_top - margin).max(40.0);
+        // The largest size from 20 pt down to 12 pt at which every bullet fits.
+        let layout = |size: f64| -> Vec<Vec<String>> { slide.bullets.iter().map(|b| wrap(b.trim(), size, text_w - 28.0)).collect::<Vec<_>>() };
+        let height = |lines: &[Vec<String>], size: f64| lines.iter().map(|l| l.len() as f64 * size * 1.25 + size * 0.6).sum::<f64>();
+        let mut size = 20.0;
+        let mut lines = layout(size);
+        while size > 12.0 && height(&lines, size) > body_h {
+            size -= 2.0;
+            lines = layout(size);
+        }
+        // Split the bullets into pages of this slide.
+        let mut chunks: Vec<Vec<Vec<String>>> = vec![Vec::new()];
+        let mut used = 0.0;
+        for b in lines {
+            let need = b.len() as f64 * size * 1.25 + size * 0.6;
+            if used + need > body_h && chunks.last().is_some_and(|c| !c.is_empty()) {
+                chunks.push(Vec::new());
+                used = 0.0;
+            }
+            used += need;
+            if let Some(last) = chunks.last_mut() {
+                last.push(b);
+            }
+        }
+        for (i, chunk) in chunks.iter().enumerate() {
+            number = number.saturating_add(1);
+            let mut c = Vec::new();
+            let mut y = top;
+            for (j, l) in heading.iter().enumerate() {
+                let text = if i > 0 && j + 1 == heading.len() { format!("{l} (cont.)") } else { l.clone() };
+                text_line(&mut c, "F2", heading_size, margin, y, &text);
+                y -= heading_size * 1.15;
+            }
+            c.extend(format!("q {accent} rg {margin} {:.2} 96 4 re f Q\n", y + heading_size * 1.15 - 14.0).into_bytes());
+            let mut y = body_top;
+            for bullet in chunk {
+                for (k, l) in bullet.iter().enumerate() {
+                    if k == 0 {
+                        c.extend(format!("q {accent} rg\n").into_bytes());
+                        text_line(&mut c, "F1", size, margin, y, "\u{2022}");
+                        c.extend_from_slice(b"Q\n");
+                    }
+                    text_line(&mut c, "F1", size, margin + 28.0, y, l);
+                    y -= size * 1.25;
+                }
+                y -= size * 0.6;
+            }
+            c.extend(b"q 0.5 0.5 0.5 rg\n");
+            let n = number.to_string();
+            text_line(&mut c, "F1", 11.0, w - margin - pdfcraft_fonts::helvetica_width(&n, 11.0), 22.0, &n);
+            c.extend(b"Q\n");
+            add_page(&mut doc, w, h, resources(), Some(c))?;
+        }
     }
     set_title(&mut doc, title);
     Ok(doc)

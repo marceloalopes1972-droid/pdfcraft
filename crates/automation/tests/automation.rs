@@ -3420,3 +3420,36 @@ fn command_batch_refuses_more_than_a_thousand_steps() {
     let err = a.call("command_batch", &json!({"steps": steps})).unwrap_err();
     assert!(err.to_string().contains("at most 1000 steps"), "{err}");
 }
+
+#[test]
+fn assistant_tools_leave_out_files_printing_signing_and_command_runners() {
+    let tools = pdfcraft_automation::assistant_tools();
+    assert!(tools.len() <= 128, "OpenAI-compatible endpoints accept at most 128 tools ({})", tools.len());
+    for t in &tools {
+        assert!(!pdfcraft_automation::ASSISTANT_WITHHELD.contains(&t.name));
+        let props = t.input_schema["properties"].as_object().map(|p| p.keys().cloned().collect::<Vec<_>>()).unwrap_or_default();
+        for p in props {
+            assert!(!["out", "out_dir", "paths", "folder"].contains(&p.as_str()), "{} writes or reads files ({p})", t.name);
+        }
+    }
+    for needed in ["text_extract", "page_rotate", "page_delete", "comment_add", "form_fill", "redact_mark", "redact_apply", "text_edit", "edit_undo"]
+    {
+        assert!(tools.iter().any(|t| t.name == needed), "{needed}");
+    }
+    for name in pdfcraft_automation::ASSISTANT_WITHHELD {
+        assert!(pdfcraft_automation::tools().iter().any(|t| t.name == *name), "{name} is a real tool");
+    }
+}
+
+#[test]
+fn an_existing_session_can_be_driven_and_handed_back() {
+    let mut s = pdfcraft_engine::Session::new();
+    let id =
+        s.open("a.pdf", None, std::sync::Arc::new(pdfcraft_engine::Session::new().create_from_text("t", "Hello").unwrap().to_vec()), None).unwrap();
+    let mut a = Automation::from_session(s, None);
+    a.call("page_rotate", &json!({ "doc": id.0, "pages": [1], "degrees": 90 })).unwrap();
+    let s = a.into_session();
+    assert!(s.get(id).unwrap().dirty);
+    let texts = pdfcraft_automation::plain_texts(&s.get(id).unwrap().bytes, None, &[0]);
+    assert!(texts[0].1.as_ref().unwrap().contains("Hello"));
+}

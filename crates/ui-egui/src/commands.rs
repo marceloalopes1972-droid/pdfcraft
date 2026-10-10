@@ -285,6 +285,12 @@ impl PdfCraftApp {
             "export.text" => self.dialog = Some(Dialog::Export(crate::export_ui::ExportKind::Text)),
             "a11y.check" => self.start_accessibility_check(),
             "ocr.recognize" => self.dialog = Some(Dialog::RecognizeText),
+            "ai.summary" => self.open_ai(crate::ai_ui::AiTask::Summarize),
+            "ai.ask" => self.open_ai(crate::ai_ui::AiTask::Ask),
+            "ai.translate" => self.open_ai(crate::ai_ui::AiTask::Translate),
+            "ai.edit" => self.open_ai(crate::ai_ui::AiTask::Edit),
+            "ai.tables" => self.open_ai(crate::ai_ui::AiTask::Tables),
+            "ai.slides" => self.open_ai(crate::ai_ui::AiTask::Slides),
             "tools.js_console" => self.dialog = Some(Dialog::JsConsole),
             "tools.document_js" => {
                 self.doc_js = Default::default();

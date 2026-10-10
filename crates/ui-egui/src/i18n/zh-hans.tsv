@@ -2077,3 +2077,51 @@
 	This printer offers no settings of its own.	此打印机没有专属设置。
 	Scroll tabs left	向左滚动选项卡
 	Scroll tabs right	向右滚动选项卡
+
+# AI assistant
+	Ask	提问
+	Presentation	演示文稿
+	Focus or audience (optional)	重点或受众（可选）
+	Your question	您的问题
+	Translate into (language)	翻译为（语言）
+	What should be changed?	要更改什么？
+	Which tables (optional)	哪些表格（可选）
+	Enter your {provider} API key.	请输入您的 {provider} API 密钥。
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	AI 助手需要桌面应用：网页版无法连接 AI 提供商。
+	Open a document first.	请先打开一个文档。
+	Pages: {e}	页面：{e}
+	Fill in “{field}”.	请填写“{field}”。
+	Stopped.	已停止。
+	The assistant stopped unexpectedly.	助手意外停止。
+	Provider	提供商
+	API key	API 密钥
+	Using {var} from the environment.	正在使用环境变量 {var}。
+	Remember API keys on this computer	在此计算机上记住 API 密钥
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	密钥将以未加密形式保存在 PdfCraft 的设置文件中。在共用计算机上请勿开启。
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	使用相同 API 的其他 HTTPS 地址，或用于本机模型的 http://localhost。
+	all	全部
+	Answer language	回答语言
+	automatic	自动
+	Slides	幻灯片数
+	auto	自动
+	Working…	正在处理…
+	Open as PDF	作为 PDF 打开
+	No tables found.	未找到表格。
+	{name} (page {page}): {rows} rows	{name}（第 {page} 页）：{rows} 行
+	{name}: {rows} rows	{name}：{rows} 行
+	Save as Excel…	另存为 Excel…
+	Save as PowerPoint…	另存为 PowerPoint…
+	{n} tool calls.	工具调用 {n} 次。
+	Stopped at the step limit before the model finished.	在模型完成前已达到步骤上限并停止。
+	{requests} requests · {input} input and {output} output tokens	{requests} 次请求 · 输入 {input} 个、输出 {output} 个令牌
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	您的指令以及模型通过工具读取的文档内容会发送给 {provider}。更改将应用于打开的文档：可通过“编辑 ▸ 撤销”撤消；在您保存之前不会保存任何内容。
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	所选页面的文本将发送给 {provider}。在您按下“运行”之前不会发送任何内容。
+	Stop	停止
+	The AI assistant has finished	AI 助手已完成
+	Saved {path}	已保存到 {path}
+	Created a PDF from the assistant's answer	已根据助手的回答创建 PDF
+	Couldn't create the PDF: {e}	无法创建 PDF：{e}
+	Bring your own API key (off by default)	使用您自己的 API 密钥（默认关闭）
+	Edit with an instruction	按指令编辑
+	Extract tables to Excel	将表格提取到 Excel
+	Create a presentation	创建演示文稿

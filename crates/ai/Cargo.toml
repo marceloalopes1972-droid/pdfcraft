@@ -1,0 +1,24 @@
+[package]
+name = "pdfcraft-ai"
+description = "Opt-in AI providers for PdfCraft (Anthropic, OpenAI, DeepSeek, xAI Grok, Google Gemini) with the user's own API key: chat, tool-use loop, and document tasks (summary, questions, tables, slides)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json = { workspace = true }
+
+# HTTPS to the provider, over rustls with the OS's trusted roots (as Help ▸ Check for updates).
+# Native targets only; without the `http` feature (or on the web) callers supply a `Transport`.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ureq = { version = "3.4", default-features = false, features = ["rustls-no-provider", "_ring"], optional = true }
+rustls-native-certs = { version = "0.8", optional = true }
+
+[features]
+default = ["http"]
+http = ["dep:ureq", "dep:rustls-native-certs"]

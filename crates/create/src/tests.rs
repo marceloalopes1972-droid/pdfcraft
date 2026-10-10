@@ -273,3 +273,30 @@ fn source_kind_tells_pdfs_images_and_text_apart() {
     assert_eq!(source_kind("a.docx", b"PK\x03\x04"), None);
     assert_eq!(source_kind("", b""), None);
 }
+
+#[test]
+fn slides_become_a_title_page_and_one_page_per_slide() {
+    let slides = vec![
+        Slide { title: "Receitas".into(), bullets: vec!["Arrecadação de R$ 1,2 mi".into(), "Alta de 8% no ano".into()] },
+        Slide { title: "Despesas".into(), bullets: vec![] },
+    ];
+    let doc = reopen(&from_slides("Relatório anual", "Exercício 2026", &slides).unwrap());
+    let p = pages(&doc);
+    assert_eq!(p.len(), 3);
+    assert_eq!(media(&p[1]), vec![0.0, 0.0, 960.0, 540.0]);
+}
+
+#[test]
+fn long_slides_continue_instead_of_dropping_text() {
+    let bullets: Vec<String> = (0..60).map(|i| format!("Item {i} with enough words to need a whole line of its own on the slide")).collect();
+    let doc = reopen(&from_slides("T", "", &[Slide { title: "Many".into(), bullets }]).unwrap());
+    assert!(pages(&doc).len() > 2, "continued slides");
+}
+
+#[test]
+fn hostile_slide_input_is_refused_or_laid_out() {
+    assert!(from_slides("T", "", &vec![Slide::default(); MAX_SLIDES + 1]).is_err());
+    // Empty titles, control characters and characters outside WinAnsi lay out without panicking.
+    let odd = Slide { title: String::new(), bullets: vec!["\u{0}\u{7}日本語 ✓".into(), String::new(), "x".repeat(5000)] };
+    assert!(from_slides("", "", &[odd]).is_ok());
+}

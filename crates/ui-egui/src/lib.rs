@@ -24,6 +24,7 @@ macro_rules! tl_ctx {
 
 mod a11y_ui;
 mod actions_ui;
+pub mod ai_ui;
 pub mod canvas;
 mod chrome;
 mod combine_ui;
@@ -394,6 +395,10 @@ pub struct PdfCraftApp {
     /// How to ask for the latest release (the desktop app sets it; see `updates`).
     pub update_source: Option<updates::UpdateSource>,
     pub(crate) updates: updates::Updates,
+    /// How the AI assistant reaches providers (the desktop app sets it; see `ai_ui`).
+    pub ai_transport: Option<ai_ui::AiTransport>,
+    /// AI assistant settings, the current run and its result.
+    pub ai: ai_ui::AiState,
     pub palette_open: bool,
     pub palette_query: String,
     pub all_tools_expanded: bool,
@@ -649,6 +654,8 @@ impl PdfCraftApp {
             dialog: None,
             update_source: None,
             updates: updates::Updates::default(),
+            ai_transport: None,
+            ai: ai_ui::AiState::default(),
             palette_open: false,
             palette_query: String::new(),
             all_tools_expanded: false,
@@ -1286,6 +1293,7 @@ impl PdfCraftApp {
             "actions": actions_ui::encode(&self.custom_actions),
             "combine_columns": self.combine_columns.to_json(),
             "comments_panel_closed": self.comments_panel_closed,
+            "ai": self.ai.to_json(),
         })
         .to_string()
     }
@@ -1294,6 +1302,7 @@ impl PdfCraftApp {
     pub fn restore(&mut self, json: &str) {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return };
         self.combine_columns = combine_ui::Columns::from_json(&v["combine_columns"]);
+        self.ai.restore(&v["ai"]);
         if let Ok(r) = serde_json::from_value::<Vec<RecentFile>>(v["recent"].clone()) {
             // Only keep entries whose files still exist.
             #[cfg(not(target_arch = "wasm32"))]
@@ -1791,6 +1800,7 @@ impl eframe::App for PdfCraftApp {
         let now = ctx.input(|i| i.time);
         self.autosave_tick(now);
         self.poll_updates();
+        self.poll_ai();
         // Shortcuts deferred last frame: the text field has taken that frame's typing since.
         let deferred = std::mem::take(&mut self.deferred_commands);
         self.shortcuts(ctx);

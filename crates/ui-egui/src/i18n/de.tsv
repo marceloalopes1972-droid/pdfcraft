@@ -2113,3 +2113,51 @@ action wizard	Start	Starten
 	This printer offers no settings of its own.	Dieser Drucker bietet keine eigenen Einstellungen.
 	Scroll tabs left	Tabs nach links scrollen
 	Scroll tabs right	Tabs nach rechts scrollen
+
+# AI assistant
+	Ask	Fragen
+	Presentation	Präsentation
+	Focus or audience (optional)	Schwerpunkt oder Zielgruppe (optional)
+	Your question	Ihre Frage
+	Translate into (language)	Übersetzen in (Sprache)
+	What should be changed?	Was soll geändert werden?
+	Which tables (optional)	Welche Tabellen (optional)
+	Enter your {provider} API key.	Geben Sie Ihren API-Schlüssel für {provider} ein.
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	Der KI-Assistent benötigt die Desktop-App: Die Webversion kann KI-Anbieter nicht erreichen.
+	Open a document first.	Öffnen Sie zuerst ein Dokument.
+	Pages: {e}	Seiten: {e}
+	Fill in “{field}”.	Füllen Sie „{field}“ aus.
+	Stopped.	Angehalten.
+	The assistant stopped unexpectedly.	Der Assistent wurde unerwartet beendet.
+	Provider	Anbieter
+	API key	API-Schlüssel
+	Using {var} from the environment.	{var} aus der Umgebung wird verwendet.
+	Remember API keys on this computer	API-Schlüssel auf diesem Computer speichern
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	Sie werden unverschlüsselt in der Einstellungsdatei von PdfCraft gespeichert. Auf einem gemeinsam genutzten Computer ausgeschaltet lassen.
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	Eine andere HTTPS-Adresse mit derselben API oder http://localhost für ein Modell auf diesem Computer.
+	all	alle
+	Answer language	Antwortsprache
+	automatic	automatisch
+	Slides	Folien
+	auto	auto
+	Working…	Wird bearbeitet…
+	Open as PDF	Als PDF öffnen
+	No tables found.	Keine Tabellen gefunden.
+	{name} (page {page}): {rows} rows	{name} (Seite {page}): {rows} Zeilen
+	{name}: {rows} rows	{name}: {rows} Zeilen
+	Save as Excel…	Als Excel speichern…
+	Save as PowerPoint…	Als PowerPoint speichern…
+	{n} tool calls.	{n} Werkzeugaufrufe.
+	Stopped at the step limit before the model finished.	Beim Schrittlimit angehalten, bevor das Modell fertig war.
+	{requests} requests · {input} input and {output} output tokens	{requests} Anfragen · {input} Eingabe- und {output} Ausgabetoken
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	Ihre Anweisung und die Teile des Dokuments, die das Modell mit seinen Werkzeugen liest, werden an {provider} gesendet. Änderungen erfolgen im geöffneten Dokument: Mit Bearbeiten ▸ Rückgängig machen Sie sie rückgängig; gespeichert wird erst, wenn Sie speichern.
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	Der Text der gewählten Seiten wird an {provider} gesendet. Gesendet wird erst, wenn Sie auf Ausführen klicken.
+	Stop	Stoppen
+	The AI assistant has finished	Der KI-Assistent ist fertig
+	Saved {path}	Gespeichert: {path}
+	Created a PDF from the assistant's answer	PDF aus der Antwort des Assistenten erstellt
+	Couldn't create the PDF: {e}	Das PDF konnte nicht erstellt werden: {e}
+	Bring your own API key (off by default)	Eigener API-Schlüssel (standardmäßig aus)
+	Edit with an instruction	Mit einer Anweisung bearbeiten
+	Extract tables to Excel	Tabellen nach Excel extrahieren
+	Create a presentation	Präsentation erstellen

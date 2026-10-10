@@ -103,6 +103,8 @@ pub const SIDEWAYS: &[(&str, &str)] = &[
     ("ui-egui", "ui-common"),
     ("ui-egui", "platform"),
     ("automation", "platform"),
+    // The AI assistant runs the model's tool calls on the app's own session.
+    ("ui-egui", "automation"),
 ];
 
 /// External crates that constitute a UI toolkit / windowing dependency (prefix match with `*`).

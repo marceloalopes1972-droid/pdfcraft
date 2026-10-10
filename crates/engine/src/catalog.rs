@@ -48,7 +48,7 @@ const fn item(label: &'static str, icon: &'static str, command: &'static str, av
     ToolItem { label, icon, command, availability }
 }
 
-use Availability::{Planned, Provider, Ready};
+use Availability::{Planned, Ready};
 
 const RED: [u8; 3] = [0xE0, 0x3E, 0x3E];
 const PURPLE: [u8; 3] = [0x8E, 0x4E, 0xE6];
@@ -512,13 +512,16 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         icon: "sparkles",
         hue: PINK,
         badge: Some("Optional"),
-        availability: Provider,
+        availability: Ready,
         sections: &[ToolSection {
-            title: "Bring your own model (off by default)",
+            title: "Bring your own API key (off by default)",
             items: &[
-                item("Summarize", "sparkles", "ai.summary", Provider),
-                item("Ask about this document", "message-circle-reply", "ai.ask", Provider),
-                item("Translate", "languages", "ai.translate", Provider),
+                item("Summarize", "sparkles", "ai.summary", Ready),
+                item("Ask about this document", "message-circle-reply", "ai.ask", Ready),
+                item("Translate", "languages", "ai.translate", Ready),
+                item("Edit with an instruction", "wand-sparkles", "ai.edit", Ready),
+                item("Extract tables to Excel", "grid-3x3", "ai.tables", Ready),
+                item("Create a presentation", "presentation", "ai.slides", Ready),
             ],
         }],
     },

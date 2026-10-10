@@ -2626,6 +2626,11 @@ impl Session {
         self.write_new(&pdfcraft_create::from_text(title, text, pdfcraft_create::LETTER, 11.0)?)
     }
 
+    /// A new 16:9 presentation PDF: a title slide, then one page per slide (title and bullets).
+    pub fn create_from_slides(&self, title: &str, subtitle: &str, slides: &[pdfcraft_create::Slide]) -> Result<Arc<Vec<u8>>, EditError> {
+        self.write_new(&pdfcraft_create::from_slides(title, subtitle, slides)?)
+    }
+
     /// Convert a file Create understands (an image or plain text) to PDF bytes; a PDF is checked
     /// (it must open and allow copying pages) and returned as it is.
     pub fn convert_to_pdf(&self, name: &str, bytes: &Arc<Vec<u8>>) -> Result<(SourceKind, Arc<Vec<u8>>), EditError> {

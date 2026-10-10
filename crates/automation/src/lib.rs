@@ -34,7 +34,7 @@ use pdfcraft_platform::staging::{StagingName, create_staging, staging_suffixes};
 use pdfcraft_render::{PageRenderer, PageText, RenderConfig, RenderRequest, RequestKind};
 use serde_json::{Value, json};
 
-pub use tools::{ToolDef, tools};
+pub use tools::{ASSISTANT_WITHHELD, ToolDef, assistant_tools, tools};
 
 /// One piece of a tool's result.
 #[derive(Clone, Debug, PartialEq)]
@@ -119,6 +119,18 @@ impl Automation {
 
     pub fn session(&self) -> &Session {
         &self.session
+    }
+
+    /// Drive an existing session (the app's own, so tool calls edit its open documents with
+    /// their undo history), with paths confined to `root` as in [`Self::with_root`]. Unlike
+    /// `with_root` this can't fail, so the session is never lost: a root that isn't a canonical
+    /// folder path simply refuses every path. Hand the session back with [`Self::into_session`].
+    pub fn from_session(session: Session, root: Option<PathBuf>) -> Self {
+        Self { session, root, ..Self::new() }
+    }
+
+    pub fn into_session(self) -> Session {
+        self.session
     }
 
     /// Save `bytes` that a caller writes on the session's behalf, such as `pdfcraft-cli run`
@@ -1769,6 +1781,12 @@ fn encode_png(width: u32, height: u32, premultiplied: &[u8]) -> Result<Vec<u8>> 
 }
 
 /// Extract the text of `pages` (0-based) with one renderer per worker thread.
+/// The plain text of `pages` (0-based) of a document's bytes, in reading order, extracted in
+/// parallel: `(page, text or error)`. Runs off the UI thread.
+pub fn plain_texts(bytes: &Arc<Vec<u8>>, password: Option<Arc<str>>, pages: &[usize]) -> Vec<(usize, std::result::Result<String, String>)> {
+    extract_parallel(bytes, password, pages).into_iter().map(|(p, t)| (p, t.map(|t| t.plain_text()))).collect()
+}
+
 fn extract_parallel(bytes: &Arc<Vec<u8>>, password: Option<Arc<str>>, pages: &[usize]) -> Vec<(usize, std::result::Result<PageText, String>)> {
     let extract = |r: &mut PageRenderer, p: usize| {
         let out = r.render(RenderRequest { page: p, kind: RequestKind::Text, tile: None, scale: 1.0, tag: 0 });

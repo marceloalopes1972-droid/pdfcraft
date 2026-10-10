@@ -113,6 +113,58 @@ impl T {
     }
 }
 
+/// Tools an AI assistant is not given when it edits the user's document: opening, saving and
+/// closing (the app does that), anything that writes files, prints, signs or reaches other
+/// documents, and the command runners, which could reach those tools by command id.
+pub const ASSISTANT_WITHHELD: &[&str] = &[
+    "doc_open",
+    "doc_close",
+    "doc_save",
+    "doc_list",
+    "doc_combine",
+    "doc_create",
+    "doc_create_multiple",
+    "doc_split",
+    "doc_compare",
+    "doc_compare_report",
+    "doc_open_revision",
+    "page_extract",
+    "page_insert_file",
+    "page_replace",
+    "doc_export_data",
+    "doc_import_data",
+    "doc_export_images",
+    "doc_export_all_images",
+    "doc_export_office",
+    "doc_export_text",
+    "doc_reduce",
+    "doc_optimize",
+    "doc_print",
+    "printers",
+    "printer_options",
+    "measure_export",
+    "comments_summarize",
+    "accessibility_report",
+    "form_merge_data",
+    "ocr_recognize_files",
+    "action_run",
+    "image_save",
+    "sign_id_create",
+    "sign_document",
+    "sign_trust",
+    "sign_windows_ids",
+    "sign_keychain_ids",
+    "command_list",
+    "command_run",
+    "command_batch",
+];
+
+/// The tools handed to an AI assistant that edits an open document: every tool except
+/// [`ASSISTANT_WITHHELD`].
+pub fn assistant_tools() -> Vec<ToolDef> {
+    tools().into_iter().filter(|t| !ASSISTANT_WITHHELD.contains(&t.name)).collect()
+}
+
 /// Every tool, in a stable order.
 pub fn tools() -> Vec<ToolDef> {
     let save_out = json!({ "type": "string", "description": "File to write. Omit to open the result as a new unsaved document instead." });

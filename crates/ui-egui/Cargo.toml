@@ -14,6 +14,12 @@ pdfcraft-engine = { workspace = true }
 pdfcraft-render = { workspace = true }
 pdfcraft-model = { workspace = true }
 pdfcraft-platform = { workspace = true }
+# AI assistant: providers and tasks (no network code here; the desktop app supplies HTTPS),
+# the automation tools an edit runs, and the Excel/PowerPoint/slide writers for its results.
+pdfcraft-ai = { workspace = true }
+pdfcraft-automation = { workspace = true }
+pdfcraft-export = { workspace = true }
+pdfcraft-create = { workspace = true }
 egui = { workspace = true, features = ["bytemuck"] }
 egui_extras = { workspace = true }
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit", "persistence", "links"] }

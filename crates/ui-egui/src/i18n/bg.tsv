@@ -2075,3 +2075,51 @@ action wizard	Start	Старт
 	This printer offers no settings of its own.	Този принтер няма собствени настройки.
 	Scroll tabs left	Превърти разделите наляво
 	Scroll tabs right	Превърти разделите надясно
+
+# AI assistant
+	Ask	Попитай
+	Presentation	Презентация
+	Focus or audience (optional)	Фокус или аудитория (по избор)
+	Your question	Вашият въпрос
+	Translate into (language)	Превод на (език)
+	What should be changed?	Какво да се промени?
+	Which tables (optional)	Кои таблици (по избор)
+	Enter your {provider} API key.	Въведете своя API ключ за {provider}.
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	ИИ асистентът изисква настолното приложение: уеб версията няма достъп до доставчиците на ИИ.
+	Open a document first.	Първо отворете документ.
+	Pages: {e}	Страници: {e}
+	Fill in “{field}”.	Попълнете „{field}“.
+	Stopped.	Спряно.
+	The assistant stopped unexpectedly.	Асистентът спря неочаквано.
+	Provider	Доставчик
+	API key	API ключ
+	Using {var} from the environment.	Използва се {var} от средата.
+	Remember API keys on this computer	Запомняне на API ключовете на този компютър
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	Те се пазят некриптирани във файла с настройки на PdfCraft. На споделен компютър оставете това изключено.
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	Друг HTTPS адрес със същия API или http://localhost за модел на този компютър.
+	all	всички
+	Answer language	Език на отговора
+	automatic	автоматично
+	Slides	Слайдове
+	auto	авто
+	Working…	Работи се…
+	Open as PDF	Отваряне като PDF
+	No tables found.	Не са намерени таблици.
+	{name} (page {page}): {rows} rows	{name} (стр. {page}): редове: {rows}
+	{name}: {rows} rows	{name}: редове: {rows}
+	Save as Excel…	Запазване като Excel…
+	Save as PowerPoint…	Запазване като PowerPoint…
+	{n} tool calls.	Извиквания на инструменти: {n}.
+	Stopped at the step limit before the model finished.	Спряно при лимита на стъпките, преди моделът да приключи.
+	{requests} requests · {input} input and {output} output tokens	Заявки: {requests} · токени: {input} входни и {output} изходни
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	Вашата инструкция и частите от документа, които моделът чете с инструментите си, се изпращат до {provider}. Промените се прилагат към отворения документ: отменете ги с Редактиране ▸ Отмяна; нищо не се запазва, докато не запазите.
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	Текстът на избраните страници се изпраща до {provider}. Нищо не се изпраща, докато не натиснете „Изпълни“.
+	Stop	Спри
+	The AI assistant has finished	ИИ асистентът приключи
+	Saved {path}	Запазено: {path}
+	Created a PDF from the assistant's answer	Създаден е PDF от отговора на асистента
+	Couldn't create the PDF: {e}	PDF файлът не можа да бъде създаден: {e}
+	Bring your own API key (off by default)	Собствен API ключ (по подразбиране изключено)
+	Edit with an instruction	Редактиране по инструкция
+	Extract tables to Excel	Извличане на таблици в Excel
+	Create a presentation	Създаване на презентация

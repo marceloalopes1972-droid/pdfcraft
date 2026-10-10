@@ -13,6 +13,8 @@ workspace = true
 # trusted roots. No bundled root list (webpki-roots and webpki-root-certs are CDLA-licensed).
 ureq = { version = "3.4", default-features = false, features = ["rustls-no-provider", "_ring"] }
 rustls-native-certs = "0.8"
+# AI assistant (opt-in, the user's own API key): HTTPS to the chosen provider.
+pdfcraft-ai = { workspace = true, features = ["http"] }
 pdfcraft-ui-egui = { workspace = true }
 # wgpu draws; OpenGL (glow) is the fallback when wgpu can't start on an old or unusual GPU or
 # driver (#461, #435, #392), and can be chosen with PDFCRAFT_RENDERER=gl.

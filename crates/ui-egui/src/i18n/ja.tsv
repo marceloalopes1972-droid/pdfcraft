@@ -2113,3 +2113,51 @@ signature pad	Type	入力
 	Text, marks and signatures become part of the page. Other comments stay editable.	テキスト、マーク、署名がページの一部になります。その他のコメントは引き続き編集できます。
 	Scroll tabs left	タブを左にスクロール
 	Scroll tabs right	タブを右にスクロール
+
+# AI assistant
+	Ask	質問
+	Presentation	プレゼンテーション
+	Focus or audience (optional)	焦点または対象読者（任意）
+	Your question	質問内容
+	Translate into (language)	翻訳先（言語）
+	What should be changed?	何を変更しますか？
+	Which tables (optional)	対象の表（任意）
+	Enter your {provider} API key.	{provider} の API キーを入力してください。
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	AI アシスタントにはデスクトップアプリが必要です。Web 版からは AI プロバイダーに接続できません。
+	Open a document first.	先に文書を開いてください。
+	Pages: {e}	ページ: {e}
+	Fill in “{field}”.	「{field}」を入力してください。
+	Stopped.	停止しました。
+	The assistant stopped unexpectedly.	アシスタントが予期せず停止しました。
+	Provider	プロバイダー
+	API key	API キー
+	Using {var} from the environment.	環境変数 {var} を使用しています。
+	Remember API keys on this computer	このコンピューターに API キーを保存する
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	キーは PdfCraft の設定ファイルに暗号化されずに保存されます。共有コンピューターではオフのままにしてください。
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	同じ API を使う別の HTTPS アドレス、またはこのコンピューター上のモデル用の http://localhost。
+	all	すべて
+	Answer language	回答の言語
+	automatic	自動
+	Slides	スライド数
+	auto	自動
+	Working…	処理中…
+	Open as PDF	PDF として開く
+	No tables found.	表は見つかりませんでした。
+	{name} (page {page}): {rows} rows	{name}（{page} ページ）: {rows} 行
+	{name}: {rows} rows	{name}: {rows} 行
+	Save as Excel…	Excel として保存…
+	Save as PowerPoint…	PowerPoint として保存…
+	{n} tool calls.	ツール呼び出し {n} 回。
+	Stopped at the step limit before the model finished.	モデルが完了する前に手順の上限で停止しました。
+	{requests} requests · {input} input and {output} output tokens	リクエスト {requests} 件 · 入力 {input} トークン、出力 {output} トークン
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	指示と、モデルがツールで読み取る文書の部分は {provider} に送信されます。変更は開いている文書に加えられます。編集 ▸ 元に戻す で取り消せます。保存するまで何も保存されません。
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	選択したページのテキストが {provider} に送信されます。実行を押すまで何も送信されません。
+	Stop	停止
+	The AI assistant has finished	AI アシスタントの処理が完了しました
+	Saved {path}	{path} に保存しました
+	Created a PDF from the assistant's answer	アシスタントの回答から PDF を作成しました
+	Couldn't create the PDF: {e}	PDF を作成できませんでした: {e}
+	Bring your own API key (off by default)	ご自身の API キーを使用（既定ではオフ）
+	Edit with an instruction	指示で編集
+	Extract tables to Excel	表を Excel に抽出
+	Create a presentation	プレゼンテーションを作成

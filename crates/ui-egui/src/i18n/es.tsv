@@ -2029,3 +2029,52 @@
 	This printer offers no settings of its own.	Esta impresora no ofrece ajustes propios.
 	Scroll tabs left	Desplazar las pestañas a la izquierda
 	Scroll tabs right	Desplazar las pestañas a la derecha
+
+# AI assistant
+	Ask	Preguntar
+	Presentation	Presentación
+	Focus or audience (optional)	Enfoque o público (opcional)
+	Your question	Su pregunta
+	Translate into (language)	Traducir a (idioma)
+	What should be changed?	¿Qué hay que cambiar?
+	Which tables (optional)	Qué tablas (opcional)
+	Enter your {provider} API key.	Introduzca su clave de API de {provider}.
+	The AI assistant needs the desktop app: the web version can't reach AI providers.	El asistente de IA necesita la aplicación de escritorio: la versión web no puede conectarse con los proveedores de IA.
+	Open a document first.	Abra primero un documento.
+	Pages: {e}	Páginas: {e}
+	Fill in “{field}”.	Rellene «{field}».
+	Stopped.	Detenido.
+	The assistant stopped unexpectedly.	El asistente se detuvo inesperadamente.
+	Provider	Proveedor
+	API key	Clave de API
+	Using {var} from the environment.	Se usa {var} del entorno.
+	Model	Modelo
+	Remember API keys on this computer	Recordar las claves de API en este equipo
+	They are kept unencrypted in PdfCraft's settings file. Leave this off on a shared computer.	Se guardan sin cifrar en el archivo de configuración de PdfCraft. Déjelo desactivado en un equipo compartido.
+	Another HTTPS address that speaks the same API, or http://localhost for a model on this computer.	Otra dirección HTTPS que use la misma API, o http://localhost para un modelo en este equipo.
+	all	todas
+	Answer language	Idioma de la respuesta
+	automatic	automático
+	Slides	Diapositivas
+	auto	auto
+	Working…	Trabajando…
+	Open as PDF	Abrir como PDF
+	No tables found.	No se encontraron tablas.
+	{name} (page {page}): {rows} rows	{name} (página {page}): {rows} filas
+	{name}: {rows} rows	{name}: {rows} filas
+	Save as Excel…	Guardar como Excel…
+	Save as PowerPoint…	Guardar como PowerPoint…
+	{n} tool calls.	{n} llamadas a herramientas.
+	Stopped at the step limit before the model finished.	Se detuvo en el límite de pasos antes de que el modelo terminara.
+	{requests} requests · {input} input and {output} output tokens	{requests} solicitudes · {input} tokens de entrada y {output} de salida
+	Your instruction, and the parts of the document the model reads with its tools, are sent to {provider}. Changes go into the open document: undo them with Edit ▸ Undo; nothing is saved until you save.	Su instrucción y las partes del documento que el modelo lee con sus herramientas se envían a {provider}. Los cambios se aplican al documento abierto: deshágalos con Edición ▸ Deshacer; no se guarda nada hasta que usted guarde.
+	The text of the chosen pages is sent to {provider}. Nothing is sent until you press Run.	El texto de las páginas elegidas se envía a {provider}. No se envía nada hasta que pulse Ejecutar.
+	Stop	Detener
+	The AI assistant has finished	El asistente de IA ha terminado
+	Saved {path}	Guardado en {path}
+	Created a PDF from the assistant's answer	Se creó un PDF a partir de la respuesta del asistente
+	Couldn't create the PDF: {e}	No se pudo crear el PDF: {e}
+	Bring your own API key (off by default)	Use su propia clave de API (desactivado de forma predeterminada)
+	Edit with an instruction	Editar con una instrucción
+	Extract tables to Excel	Extraer tablas a Excel
+	Create a presentation	Crear una presentación
